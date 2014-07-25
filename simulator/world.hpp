@@ -13,6 +13,7 @@ A 4-tuple consisting of
 2. the status of Lambda-Man;
 3. the status of all the ghosts;
 4. the status of fruit at the fruit location.
+5. (added) UTC
 
 The map is encoded as a list of lists (row-major) representing the 2-d
 grid. An enumeration represents the contents of each grid cell:
@@ -26,28 +27,11 @@ grid. An enumeration represents the contents of each grid cell:
   * 6: Ghost starting position (`=`)
  */
 
-enum GridCell {
-    WALL = 0,
-    EMPTY = 1,
-    PILL = 2,
-    POWER_PILL = 3,
-    FRUIT = 4,
-    LAMBDAMAN = 5,
-    GHOST = 6
-};
+enum GridCell { WALL = 0, EMPTY = 1, PILL = 2, POWER_PILL = 3, FRUIT = 4, LAMBDAMAN = 5, GHOST = 6 };
 
-enum Direction {
-    UP = 0,
-    RIGHT = 1,
-    DOWN = 2,
-    LEFT = 3
-};
+enum Direction { UP = 0, RIGHT = 1, DOWN = 2, LEFT = 3 };
 
-enum GhostVit {
-    STANDARD = 0,
-    FRIGHT = 1,
-    INVISIBLE = 2
-};
+enum GhostVit { STANDARD = 0, FRIGHT = 1, INVISIBLE = 2 };
 
 // World map = a list of lists (row-major) representing the grid
 /*
@@ -62,7 +46,7 @@ using WorldMap = std::vector<std::vector<GridCell>>;
 using Location = std::pair<unsigned int, unsigned int>;
 // 
 /*
-Lambda-Man status = vitality, current location, current direction, remaining lives, current score
+Lambda-Man status = vitality, current location, current direction, remaining lives, current score, countdown to next step 
 
 Lambda-Man's vitality is a number which is a countdown to the expiry of
 the active power pill, if any. It is 0 when no power pill is active.
@@ -70,7 +54,8 @@ the active power pill, if any. It is 0 when no power pill is active.
   * n > 0: power pill mode: the number of game ticks remaining while the
            power pill will will be active
  */
-using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t>;
+enum LMIndex { LMVIT = 0, LMLOC = 1, LMDIR = 2, LMLIVES = 3, LMSCORE = 4, LMSTEP = 5 };
+using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t, size_t>;
 
 /*
 The status of all the ghosts is a list with the status for each ghost.
@@ -81,8 +66,10 @@ The status for each ghost is a 3-tuple consisting of
   1. the ghost's vitality
   2. the ghost's current location, as an (x,y) pair
   3. the ghost's current direction
+  4. (added) countdown to next step
  */
-using GhostStat = std::tuple<GhostVit, Location, Direction>;
+enum GSIndex { GSVIT = 0, GSLOC = 1, GSDIR = 2, GSSTEP = 3 };
+using GhostStat = std::tuple<GhostVit, Location, Direction, size_t>;
 
 /*
 The status of the fruit is a number which is a countdown to the expiry of
@@ -91,8 +78,17 @@ the current fruit, if any.
   * n > 0: fruit present: the number of game ticks remaining while the
            fruit will will be present.
  */
-using WorldState = std::tuple<WorldMap, LambdaManStat, std::vector<GhostStat>, unsigned int>;
+enum WSIndex { WSMAP = 0, WSLAMBDA = 1, WSGHOSTS = 2, WSFRUIT = 3, WSEOL = 4, WSUTC = 5 };
+using WorldState = std::tuple<WorldMap, LambdaManStat, std::vector<GhostStat>, unsigned int, size_t, size_t>;
 
+/*
+ * Advance the world state to the next tick with activity.
+ */
+void step(WorldState&);
+
+/*
+ * Execute the world until Lambda-Man wins, loses, or runs out of time.
+ */
 void runWorld(std::string world_map, std::string lambda_script, std::vector<std::string> ghost_scripts);
 }
 
