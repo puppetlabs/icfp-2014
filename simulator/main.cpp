@@ -6,10 +6,34 @@
 #include "world.hpp"
 
 using namespace std;
+static const char *world_map = "\
+#######################\n\
+#..........#..........#\n\
+#.###.####.#.####.###.#\n\
+#o###.####.#.####.###o#\n\
+#.....................#\n\
+#.###.#.#######.#.###.#\n\
+#.....#....#....#.....#\n\
+#####.#### # ####.#####\n\
+#   #.#    =    #.#   #\n\
+#####.# ### ### #.#####\n\
+#    .  # === #  .    #\n\
+#####.# ####### #.#####\n\
+#   #.#    %    #.#   #\n\
+#####.# ####### #.#####\n\
+#..........#..........#\n\
+#.###.####.#.####.###.#\n\
+#o..#......\\......#..o#\n\
+###.#.#.#######.#.#.###\n\
+#.....#....#....#.....#\n\
+#.########.#.########.#\n\
+#.....................#\n\
+#######################\n\
+";
 
 int main(int argc, char *argv[])
 {
-    // Read files from command-line.
+    // Read files from command-line. Game board, 
     cout << "Loading files:";
     for(int i = 1; i < argc; ++i) {
         cout << " " << argv[i];
@@ -19,7 +43,7 @@ int main(int argc, char *argv[])
     // Instantiate and run world.
     cout << "Instantiating world..." << endl;
     LambdaWorld world;
-    world.run();
+    world.run(world_map, "", {""});
     return 0;
 }
 
