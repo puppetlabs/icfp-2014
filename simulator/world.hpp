@@ -1,8 +1,9 @@
 #pragma once
 
-#include <boost/heap/fibonacci_heap.hpp>
 #include <tuple>
+#include <vector>
 
+namespace LambdaWorld {
 /*
 The state of the world is encoded as follows:
 
@@ -69,7 +70,7 @@ the active power pill, if any. It is 0 when no power pill is active.
   * n > 0: power pill mode: the number of game ticks remaining while the
            power pill will will be active
  */
-using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, unsigned int>;
+using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t>;
 
 /*
 The status of all the ghosts is a list with the status for each ghost.
@@ -92,9 +93,6 @@ the current fruit, if any.
  */
 using WorldState = std::tuple<WorldMap, LambdaManStat, std::vector<GhostStat>, unsigned int>;
 
-struct LambdaWorld {
-    boost::heap::fibonacci_heap<int> moves;
-
-    void run(std::string world_map, std::string lambda_script, std::vector<std::string> ghost_scripts);
-};
+void runWorld(std::string world_map, std::string lambda_script, std::vector<std::string> ghost_scripts);
+}
 

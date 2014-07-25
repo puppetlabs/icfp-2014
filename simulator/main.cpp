@@ -6,6 +6,7 @@
 #include "world.hpp"
 
 using namespace std;
+using namespace LambdaWorld;
 static const char *world_map = "\
 #######################\n\
 #..........#..........#\n\
@@ -42,8 +43,7 @@ int main(int argc, char *argv[])
 
     // Instantiate and run world.
     cout << "Instantiating world..." << endl;
-    LambdaWorld world;
-    world.run(world_map, "", {""});
+    runWorld(world_map, "", {""});
     return 0;
 }
 
