@@ -6,11 +6,14 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
 find_package(Boost REQUIRED)
 
 set(LAMBDA_MAN_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/world.cpp
     ${CMAKE_CURRENT_LIST_DIR}/main.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/aiproc.cpp
     )
 
 include_directories(
