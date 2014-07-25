@@ -97,6 +97,15 @@
          (map #(code->str fn-addrs %))
          (string/join "\n"))))
 
+(defn compile-function
+  [[name args & body :as code] fns]
+  {:pre [(list? code)]}
+  (let [fns (assoc fns name {})
+        [stmt & stmts] (mapcat #(compile-form args fns %) body)]
+    (concat [(conj stmt (format "; define %s" name))]
+            stmts
+            [[:rtn]])))
+
 (defn compile-ai
   [file]
   {:pre [(string? file)]
@@ -105,12 +114,6 @@
     (loop [form (read prog false nil)
            fns {}]
       (if form
-        (let [fn-name (first form)
-              args (second form)
-              forms (drop 2 form)
-              vars args
-              fns (assoc fns fn-name {})
-              code (mapcat #(compile-form vars fns %) forms)
-              code (concat code [[:rtn "; return from" fn-name]])]
-          (recur (read prog false nil) (assoc fns fn-name {:name fn-name :code code})))
+        (let [code (compile-function form fns)]
+          (recur (read prog false nil) (assoc fns (first form) {:name (first form) :code code})))
         (emit-code (assign-addresses fns))))))
