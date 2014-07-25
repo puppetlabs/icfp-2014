@@ -1,13 +1,14 @@
 /*
  * Implement the lambda-man world mechanics: http://icfpcontest.org/specification.html#the-lambda-man-game-rules
  */
+#include "world.hpp"
 #include <iostream>
 
 using namespace std;
+using namespace boost;
 
-int main(int argc, char *argv[])
+void LambdaWorld::run()
 {
-    cout << "Hello World" << endl;
-    return 0;
+    cout << "Run world." << endl;
 }
 

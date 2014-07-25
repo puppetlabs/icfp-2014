@@ -10,6 +10,7 @@ find_package(Boost REQUIRED)
 
 set(LAMBDA_MAN_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/world.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/main.cpp
     )
 
 include_directories(
