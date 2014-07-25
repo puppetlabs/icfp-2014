@@ -8,7 +8,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS regex)
 
 set(LAMBDA_MAN_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/world.cpp
@@ -21,7 +21,8 @@ include_directories(
 )
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
-add_executable(lamdba-man ${LAMBDA_MAN_SOURCES})
+add_executable(lambda-man ${LAMBDA_MAN_SOURCES})
+target_link_libraries(lambda-man ${Boost_LIBRARIES})
 
 add_test("run_world" "${PROJECT_BINARY_DIR}/lamdba-man")
 

@@ -18,11 +18,11 @@ grid. An enumeration represents the contents of each grid cell:
 
   * 0: Wall (`#`)
   * 1: Empty (`<space>`)
-  * 2: Pill
-  * 3: Power pill
-  * 4: Fruit location
-  * 5: Lambda-Man starting position
-  * 6: Ghost starting position
+  * 2: Pill (`.`)
+  * 3: Power pill (`o`)
+  * 4: Fruit location (`%`)
+  * 5: Lambda-Man starting position (`\`)
+  * 6: Ghost starting position (`=`)
  */
 
 enum GridCell {
@@ -95,6 +95,6 @@ using WorldState = std::tuple<WorldMap, LambdaManStat, std::vector<GhostStat>, u
 struct LambdaWorld {
     boost::heap::fibonacci_heap<int> moves;
 
-    void run();
+    void run(std::string world_map, std::string lambda_script, std::vector<std::string> ghost_scripts);
 };
 
