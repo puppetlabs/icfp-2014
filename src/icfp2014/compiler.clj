@@ -70,7 +70,7 @@
            address 0]
       (if-let [func (get funcs index)]
         (let [new-funcs (update-in funcs [index] assoc :address address)
-              address (+ address (count (:code func)))]
+              address (+ address (:length func))]
           (recur new-funcs (inc index) address))
         funcs))))
 
@@ -101,10 +101,13 @@
   [[name args & body :as code] fns]
   {:pre [(list? code)]}
   (let [fns (assoc fns name {})
-        [stmt & stmts] (mapcat #(compile-form args fns %) body)]
-    (concat [(conj stmt (format "; define %s" name))]
-            stmts
-            [[:rtn]])))
+        [stmt & stmts] (mapcat #(compile-form args fns %) body)
+        code (concat [(conj stmt (format "; define %s" name))]
+                     stmts
+                     [[:rtn]])]
+    {:name name
+     :code code
+     :length (count code)}))
 
 (defn compile-ai
   [file]
@@ -114,6 +117,6 @@
     (loop [form (read prog false nil)
            fns {}]
       (if form
-        (let [code (compile-function form fns)]
-          (recur (read prog false nil) (assoc fns (first form) {:name (first form) :code code})))
+        (let [func (compile-function form fns)]
+          (recur (read prog false nil) (assoc fns (:name func) func)))
         (emit-code (assign-addresses fns))))))
