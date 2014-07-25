@@ -2,15 +2,32 @@
   (:require [clojure.java.io]
             [clojure.string :as string]))
 
-(def fns (atom {}))
+(def macros
+  {'up [[:ldc 0 "; up"]]
+   'right [[:ldc 1 "; right"]]
+   'down [[:ldc 2 "; down"]]
+   'left [[:ldc 3 "; left"]]})
+
+(def builtins
+  {'inc (fn [x]
+          [x
+           [:ldc 1 "; inc"]
+           [:add "; inc"]])
+   'dec (fn [x]
+          [x
+           [:ldc 1 "; inc"]
+           [:sub "; inc"]])})
 
 (defn compile-form
   [vars fns form]
-  {:post [(or (prn "val is" %) (sequential? %))
+  {:post [(sequential? %)
           (every? vector? %)]}
   (cond
     (integer? form)
     [[:ldc form]]
+
+    (macros form)
+    (macros form)
 
     (symbol? form)
     (if (fns form)
@@ -25,15 +42,18 @@
               (repeat (count form) [:cons])))
 
     (seq? form)
-    (let [[fn-name & args] form]
-      (prn form)
+    (let [[fn-name & args] form
+          evaled-args (mapcat #(compile-form vars fns %) args)]
       (if (= fn-name 'quote)
-        (do (prn args) (concat (mapcat #(compile-form vars fns %) (first args))
-                               (repeat (dec (count form)) [:cons])))
-        (cons [:ap (dec (count form))]
-              ;; Push the args onto the stack in reverse order:
-              ;; first arg is top of the stack
-              (mapcat #(compile-form vars %) args))))
+        (concat (mapcat #(compile-form vars fns %) (first args))
+                (repeat (dec (count form)) [:cons]))
+        (if (builtins fn-name)
+          (apply (builtins fn-name) evaled-args)
+          (concat
+            ;; Push the args onto the stack
+            evaled-args
+            [[:ldf fn-name]
+             [:ap (dec (count form))]]))))
 
     :else
     (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))))
@@ -91,6 +111,6 @@
               vars args
               fns (assoc fns fn-name {})
               code (mapcat #(compile-form vars fns %) forms)
-              code (concat code [[:RTN]])]
+              code (concat code [[:rtn "; return from" fn-name]])]
           (recur (read prog false nil) (assoc fns fn-name {:name fn-name :code code})))
         (emit-code (assign-addresses fns))))))

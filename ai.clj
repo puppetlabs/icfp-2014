@@ -1,5 +1,5 @@
 (step [state world]
-  '(state 1))
+  '((inc state) right))
 
 (main [init-world _]
   '(0 step))
