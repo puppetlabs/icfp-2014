@@ -55,8 +55,8 @@ the active power pill, if any. It is 0 when no power pill is active.
   * n > 0: power pill mode: the number of game ticks remaining while the
            power pill will will be active
  */
-enum LMIndex { LMVIT = 0, LMLOC = 1, LMDIR = 2, LMLIVES = 3, LMSCORE = 4, LMSTEP = 5, LMPROC = 6, LMSTATE = 7, LMFUNC = 8 };
-using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t, size_t, aiproc::State, aiproc::Value, aiproc::Closure>;
+enum LMIndex { LMVIT = 0, LMLOC = 1, LMDIR = 2, LMLIVES = 3, LMSCORE = 4, LMSTEP = 5, LMPROC = 6, LMSTATE = 7, LMFUNC = 8, LMEATEN = 9, LMSTART = 10 };
+using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t, size_t, aiproc::State, aiproc::Value, aiproc::Closure, unsigned int, Location>;
 
 /*
 The status of all the ghosts is a list with the status for each ghost.
@@ -69,8 +69,8 @@ The status for each ghost is a 3-tuple consisting of
   3. the ghost's current direction
   4. (added) countdown to next step
  */
-enum GSIndex { GSVIT = 0, GSLOC = 1, GSDIR = 2, GSSTEP = 3 };
-using GhostStat = std::tuple<GhostVit, Location, Direction, size_t>;
+enum GSIndex { GSVIT = 0, GSLOC = 1, GSDIR = 2, GSSTEP = 3, GSSTART = 4 };
+using GhostStat = std::tuple<GhostVit, Location, Direction, size_t, Location>;
 
 /*
 The status of the fruit is a number which is a countdown to the expiry of
