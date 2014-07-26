@@ -31,7 +31,7 @@
     (macros form)
 
     (symbol? form)
-    (if (fns form)
+    (if (some #(= (:name %) form) fns)
       [[:ldf form]]
       [[:ld 0 (.indexOf vars form)]])
 
@@ -61,20 +61,17 @@
 
 (defn assign-addresses
   [fns]
-  {:pre [(map? fns)
-         (every? symbol? (keys fns))
-         (every? map? (vals fns))]
+  {:pre [(vector? fns)
+         (every? map? fns)]
    :post [(every? (comp integer? :address) %)]}
-  (let [prelude (fns 'prelude)
-        others (vals (sort (dissoc fns 'prelude)))]
-    (loop [funcs (vec (concat [prelude] others))
-           index 0
-           address 0]
-      (if-let [func (get funcs index)]
-        (do (prn func) (let [new-funcs (update-in funcs [index] assoc :address address)
-              address (+ address (:length func))]
-          (recur new-funcs (inc index) address)))
-        funcs))))
+  (loop [funcs fns
+         index 0
+         address 0]
+    (if-let [func (get funcs index)]
+      (let [new-funcs (update-in funcs [index] assoc :address address)
+                           address (+ address (:length func))]
+                       (recur new-funcs (inc index) address))
+      funcs)))
 
 (defn code->str
   [fn-addrs line]
@@ -99,22 +96,21 @@
         main {:name 'main
               :code code
               :length (count code)}]
-    (assoc fns 'main main)))
+    (conj fns main)))
 
 (defn generate-prelude
   [fns]
-  (let [others (vals (sort (dissoc fns 'main 'step)))
-        loads  (for [func others]
+  (let [loads  (for [func fns]
                  [:ldf (:name func)])
-        code (concat [[:dum (count others) "; define prelude"]]
+        code (concat [[:dum (count fns) "; define prelude"]]
                      loads
                      [[:ldf 'main]
-                      [:rap (count others)]
+                      [:rap (count fns)]
                       [:rtn]])
         prelude {:name 'prelude
               :code code
               :length (count code)}]
-    (assoc fns 'prelude prelude)))
+    (vec (cons prelude fns))))
 
 (defn emit-code
   [fns]
@@ -129,7 +125,7 @@
 (defn compile-function
   [[name args & body :as code] fns]
   {:pre [(list? code)]}
-  (let [fns (assoc fns name {})
+  (let [fns (conj fns {:name name})
         [stmt & stmts] (mapcat #(compile-form args fns %) body)
         code (concat [(conj stmt (format "; define %s" name))]
                      stmts
@@ -144,10 +140,10 @@
    :post [(string? %)]}
   (let [prog (java.io.PushbackReader. (clojure.java.io/reader file))]
     (loop [form (read prog false nil)
-           fns {}]
+           fns []]
       (if form
         (let [func (compile-function form fns)]
-          (recur (read prog false nil) (assoc fns (:name func) func)))
+          (recur (read prog false nil) (conj fns func)))
         (-> fns
             (generate-main)
             (generate-prelude)
