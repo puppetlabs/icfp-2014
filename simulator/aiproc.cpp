@@ -32,13 +32,14 @@ namespace insn {
     };
   }
 
-  Instruction ldf(counter addr) {
-    return [addr](State* state) {
-      Closure c;
-      c.environ = state->environment;
-      c.address = addr;
-      state->data_stack.push_back(c);
-    };
+  Instruction add() {
+    return [](State* state) {
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      state->data_stack.push_back(val1+val2);
+    }
   }
 
   Instruction cons() {
@@ -52,12 +53,64 @@ namespace insn {
     };
   }
 
+  Instruction ldf(counter addr) {
+    return [addr](State* state) {
+      Closure c;
+      c.environ = state->environment;
+      c.address = addr;
+      state->data_stack.push_back(c);
+    };
+  }
+
+  Instruction ap(int32_t count) {
+    return [count](State* state) {
+      auto fn = boost::get<Closure>(state->data_stack.back());
+      state->data_stack.pop_back();
+      std::vector<Value> args;
+      for(int32_t i = 0; i < count; ++i) {
+	args.push_back(state->data_stack.back());
+	state->data_stack.pop_back();
+      }
+      auto env = Environment::create(args, fn.environ);
+      state->control_stack.push_back(state->environment);
+      state->control_stack.push_back(state->program);
+      state->environment = env;
+      state->program = fn.address;
+    };
+  }
+
   Instruction rtn() {
     return [](State* state) {
       state->program = boost::get<counter>(state->control_stack.back());
       state->control_stack.pop_back();
       state->environment = boost::get<Environment::ptr>(state->control_stack.back());
       state->control_stack.pop_back();
+    };
+  }
+
+  Instruction dum(int32_t size) {
+    return [size](State* state) {
+      auto env = Environment::create(std::vector<Value>(), state->environment);
+      env->values.resize(size);
+      state->environment = env;
+    };
+  }
+
+  Instruction rap(int32_t arg_count) {
+    return [arg_count](State* state) {
+      auto fn = boost::get<Closure>(state->data_stack.back());
+      state->data_stack.pop_back();
+      if(fn.environ != state->environment)
+	throw std::runtime_error("Frame Mismatch");
+      if(arg_count != state->environment->values.size())
+	throw std::runtime_error("Frame Mismatch");
+      for(int i = 0; i < arg_count; ++i) {
+	state->environment->values[i] = state->data_stack.back();
+	state->data_stack.pop_back();
+      }
+      state->control_stack.push_back(state->environment->parent);
+      state->control_stack.push_back(state->program);
+      state->program = fn.address;
     };
   }
 
@@ -81,12 +134,20 @@ namespace insn {
       return ldc(arg0);
     if(opcode == "ld")
       return ld(arg0, arg1);
-    else if(opcode == "ldf")
-      return ldf(arg0);
+    if(opcode == "add")
+      return add();
     else if(opcode == "cons")
       return cons();
+    else if(opcode == "ldf")
+      return ldf(arg0);
+    else if(opcode == "ap")
+      return ap(arg0);
     else if(opcode == "rtn")
       return rtn();
+    else if(opcode == "dum")
+      return dum(arg0);
+    else if(opcode == "rap")
+      return rap(arg0);
     else
       throw std::runtime_error("Unknown opcode: " + opcode);
   }
