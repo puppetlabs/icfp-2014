@@ -1,6 +1,7 @@
 (ns icfp2014.compiler
   (:require [clojure.java.io]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [spyscope.core :as spy]))
 
 (def macros
   {'up [[:ldc 0 "; up"]]
@@ -26,7 +27,7 @@
     (integer? form)
     [[:ldc form]]
 
-    (macros form)
+    (contains? macros form)
     (macros form)
 
     (symbol? form)
@@ -53,7 +54,7 @@
             ;; Push the args onto the stack
             evaled-args
             [[:ldf fn-name]
-             [:ap (dec (count form))]]))))
+             [:ap (count args)]]))))
 
     :else
     (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))))
@@ -62,16 +63,17 @@
   [fns]
   {:pre [(map? fns)
          (every? symbol? (keys fns))
-         (every? map? (vals fns))]}
-  (let [main (fns 'main)
-        others (vals (sort (dissoc fns 'main)))]
-    (loop [funcs (apply vector main others)
+         (every? map? (vals fns))]
+   :post [(every? (comp integer? :address) %)]}
+  (let [prelude (fns 'prelude)
+        others (vals (sort (dissoc fns 'prelude)))]
+    (loop [funcs (vec (concat [prelude] others))
            index 0
            address 0]
       (if-let [func (get funcs index)]
-        (let [new-funcs (update-in funcs [index] assoc :address address)
+        (do (prn func) (let [new-funcs (update-in funcs [index] assoc :address address)
               address (+ address (:length func))]
-          (recur new-funcs (inc index) address))
+          (recur new-funcs (inc index) address)))
         funcs))))
 
 (defn code->str
@@ -80,16 +82,43 @@
    :post [(string? %)]}
   (condp = (first line)
     :ldf
-    (format "LDF %s ; load function %s"
+    (format "LDF %d ; load function %s"
             (fn-addrs (second line))
-            (last line))
+            (second line))
 
     (let [[op & args] line]
       (string/join " " (cons (string/upper-case (name op)) args)))))
 
+(defn generate-main
+  [fns]
+  ;; This depends on the initial state we want
+  (let [code [[:ldc 0 "; define main"]
+              [:ldf 'step]
+              [:cons]
+              [:rtn]]
+        main {:name 'main
+              :code code
+              :length (count code)}]
+    (assoc fns 'main main)))
+
+(defn generate-prelude
+  [fns]
+  (let [others (vals (sort (dissoc fns 'main 'step)))
+        loads  (for [func others]
+                 [:ldf (:name func)])
+        code (concat [[:dum (count others) "; define prelude"]]
+                     loads
+                     [[:ldf 'main]
+                      [:rap (count others)]
+                      [:rtn]])
+        prelude {:name 'prelude
+              :code code
+              :length (count code)}]
+    (assoc fns 'prelude prelude)))
+
 (defn emit-code
   [fns]
-  {:pre [(vector? fns)
+  {:pre [(sequential? fns)
          (every? map? fns)]
    :post [(string? %)]}
   (let [fn-addrs (into {} (map (juxt :name :address) fns))]
@@ -119,4 +148,8 @@
       (if form
         (let [func (compile-function form fns)]
           (recur (read prog false nil) (assoc fns (:name func) func)))
-        (emit-code (assign-addresses fns))))))
+        (-> fns
+            (generate-main)
+            (generate-prelude)
+            (assign-addresses)
+            (emit-code))))))
