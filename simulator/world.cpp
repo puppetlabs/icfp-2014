@@ -11,6 +11,7 @@ using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
 using namespace LambdaWorld;
+using namespace aiproc;
 
 static const int XMOVE[4] = {0, 1, 0, -1};
 static const int YMOVE[4] = {-1, 0, 1, 0};
@@ -46,7 +47,7 @@ static string printWorld(WorldState &world)
     return grid;
 }
 
-static WorldState process(string world_map)
+static WorldState process(string world_map, string lambda_script)
 {
     WorldState world;
     map<char, GridCell> gridCellLookup = {{'#', WALL}, {' ', EMPTY}, {'.', PILL}, {'o', POWER_PILL}, {'%', FRUIT}, {'\\', LAMBDAMAN}, {'=', GHOST}};
@@ -68,7 +69,7 @@ static WorldState process(string world_map)
             return line;
             });
 
-    assert(print_world(world) == world_map);
+    assert(printWorld(world) == world_map);
 
     // Initialize lambda-man.
     Location lambdaManLoc;
@@ -81,7 +82,7 @@ static WorldState process(string world_map)
             }
         }
     }
-    get<WSLAMBDA>(world) = make_tuple(0, lambdaManLoc, UP, 3, 0, LM_MOVE);
+    get<WSLAMBDA>(world) = make_tuple(0, lambdaManLoc, UP, 3, 0, LM_MOVE, aiproc::compile_program(lambda_script), Value(), Closure());
 
     // Initialize no fruit present.
     get<WSFRUIT>(world) = 0;
@@ -102,11 +103,24 @@ static bool isLegalMove(Location &loc, Direction &dir, WorldMap &wm)
     return !(newy >= wm.size() || newx >= wm[0].size() || wm[newy][newx] == WALL);
 }
 
-// Input: a world map, Lambda-Man AI script, N Ghost AI scripts
 
+// Input: a world map, Lambda-Man AI script, N Ghost AI scripts
 void LambdaWorld::runWorld(string world_map, string lambda_script, vector<string> ghost_scripts)
 {
-    WorldState world = process(world_map);
+    WorldState world = process(world_map, lambda_script);
+
+    // setup the main entry point.
+    Closure main;
+    std::vector<Value> main_args;
+    main_args.push_back(0); // world_state
+    main_args.push_back(0); // UNKNOWN
+    main.address = 0;
+
+    // Run the main program to get the initial AI state and
+    // our tick function
+    auto result = get<LMPROC>(get<WSLAMBDA>(world)).run(main, main_args);
+    get<LMSTATE>(get<WSLAMBDA>(world)) = result->car;
+    get<LMFUNC>(get<WSLAMBDA>(world)) = boost::get<Closure>(result->cdr);
 
     // Initialize Lambda-Man and ghost AI processors.
     while (get<WSUTC>(world) < get<WSEOL>(world)) {
@@ -151,7 +165,15 @@ void LambdaWorld::step(WorldState &world)
         auto &lmStep = get<LMSTEP>(lambdaMan);
         Location &lambdaManLoc = get<LMLOC>(lambdaMan);
         if (lmStep == 0) {
-            Direction lambdaManDir = LEFT; // TODO: Query AI
+
+            vector<Value> tick_args;
+            tick_args.push_back(get<LMSTATE>(lambdaMan));
+            tick_args.push_back(0); // world state
+            auto result = get<LMPROC>(lambdaMan).run(get<LMFUNC>(lambdaMan), tick_args);
+            get<LMFUNC>(lambdaMan).environ->values.clear(); // clear function args after call.
+            get<LMSTATE>(lambdaMan) = result->car;
+            Direction lambdaManDir = static_cast<Direction>(boost::get<int32_t>(result->cdr));
+
             if (isLegalMove(lambdaManLoc, lambdaManDir, wm)) {
                 // Move Lambda-Man.
                 lambdaManLoc.first += XMOVE[(size_t)lambdaManDir];

@@ -2,6 +2,7 @@
 
 #include <tuple>
 #include <vector>
+#include "aiproc.hpp"
 
 namespace LambdaWorld {
 /*
@@ -54,8 +55,8 @@ the active power pill, if any. It is 0 when no power pill is active.
   * n > 0: power pill mode: the number of game ticks remaining while the
            power pill will will be active
  */
-enum LMIndex { LMVIT = 0, LMLOC = 1, LMDIR = 2, LMLIVES = 3, LMSCORE = 4, LMSTEP = 5 };
-using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t, size_t>;
+enum LMIndex { LMVIT = 0, LMLOC = 1, LMDIR = 2, LMLIVES = 3, LMSCORE = 4, LMSTEP = 5, LMPROC = 6, LMSTATE = 7, LMFUNC = 8 };
+using LambdaManStat = std::tuple<unsigned int, Location, Direction, unsigned int, size_t, size_t, aiproc::State, aiproc::Value, aiproc::Closure>;
 
 /*
 The status of all the ghosts is a list with the status for each ghost.
