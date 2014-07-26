@@ -103,7 +103,7 @@
 
 (defn generate-prelude
   [fns]
-  (let [others (vals (sort (dissoc fns 'main)))
+  (let [others (vals (sort (dissoc fns 'main 'step)))
         loads  (for [func others]
                  [:ldf (:name func)])
         code (concat [[:dum (count others) "; define prelude"]]

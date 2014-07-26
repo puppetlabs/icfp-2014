@@ -1,0 +1,14 @@
+DUM 0 ; define prelude
+LDF 4 ; load function main
+RAP 0
+RTN
+LDC 0 ; define main
+LDF 8 ; load function step
+CONS
+RTN
+LD 0 0 ; define step
+LDC 1 ; inc
+ADD ; inc
+LDC 1 ; right
+CONS
+RTN
