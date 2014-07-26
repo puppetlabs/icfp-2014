@@ -32,6 +32,16 @@ static const char *world_map = "\
 #######################\n\
 ";
 
+static const char *lambda_prog =
+  "LDC 0\n"
+  "LDF 4\n"
+  "CONS\n"
+  "RTN\n"
+  "LDC 0\n"
+  "LDC 1\n"
+  "CONS\n"
+  "RTN\n";
+
 int main(int argc, char *argv[])
 {
     // Read files from command-line. Game board, 
@@ -43,7 +53,7 @@ int main(int argc, char *argv[])
 
     // Instantiate and run world.
     cout << "Instantiating world..." << endl;
-    runWorld(world_map, "", {""});
+    runWorld(world_map, lambda_prog, {""});
     return 0;
 }
 

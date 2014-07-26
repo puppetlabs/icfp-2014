@@ -9,4 +9,6 @@ pom.xml.asc
 /.nrepl-port
 /build
 /simulator/build
+/simulator/release
+/simulator/debug
 *.swp

@@ -105,7 +105,7 @@ namespace aiproc {
     // is defined to be at address 0. So if we're calling address 0
     // we use 60 seconds, else we just use 1.
     auto max_insns = program ? PROGRAM_TIME : 60 * PROGRAM_TIME;
-    decltype(max_insns) executed_insns;
+    decltype(max_insns) executed_insns = 0;
 
     control.push_back(program);
     environment.push_back(start.environ);
