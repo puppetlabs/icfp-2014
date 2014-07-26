@@ -4,20 +4,64 @@
             [spyscope.core :as spy]))
 
 (def macros
-  {'up [[:ldc 0 "; up"]]
+  {'up    [[:ldc 0 "; up"]]
    'right [[:ldc 1 "; right"]]
-   'down [[:ldc 2 "; down"]]
-   'left [[:ldc 3 "; left"]]})
+   'down  [[:ldc 2 "; down"]]
+   'left  [[:ldc 3 "; left"]]})
 
 (def builtins
-  {'inc (fn [x]
+  {
+   ;; Primitive math
+
+   'inc (fn [x]
           [x
            [:ldc 1 "; inc"]
            [:add "; inc"]])
    'dec (fn [x]
           [x
            [:ldc 1 "; dec"]
-           [:sub "; dec"]])})
+           [:sub "; dec"]])
+
+   '+   (fn
+          ([] [[:ldc 0 "; +"]])
+          ([& nums]
+             (into [] (concat nums (repeat (dec (count nums)) [:add "; +"])))))
+   '-   (fn
+          ([x] [[:ldc 0 "; -"] x [:sub "; -"]])
+          ([x y & nums]
+             (into [] (concat
+                       [x y [:sub "; -"]]
+                       (apply concat (for [num nums]
+                                       [num [:sub "; -"]]))))))
+   '*   (fn
+          ([] [[:ldc 1 "; *"]])
+          ([& nums]
+             (into [] (concat nums (repeat (dec (count nums)) [:mul "; *"])))))
+   '/   (fn
+          ([x] [[:ldc 1 "; /"] x [:div "; -"]])
+          ([x y] [x y [:div "; /"]]))
+
+   ;; Comparison ops
+
+   '=   (fn [x y] [x y [:ceq "; ="]])
+   '>   (fn [x y] [x y [:cgt "; >"]])
+   '>=  (fn [x y] [x y [:cgte "; >="]])
+   '<   (fn [x y]
+          ;; if x isn't >= y, then x < y
+          [x
+           y
+           [:cgte "; <"]
+           [:ldc 0 "; <"]
+           [:ceq "; <"]])
+   '<=  (fn [x y]
+          ;; if x isn't > y, then x <= y
+          [x
+           y
+           [:cgt "; <="]
+           [:ldc 0 "; <="]
+           [:ceq "; <="]])
+
+   })
 
 (defn load-var
   [vars name]
