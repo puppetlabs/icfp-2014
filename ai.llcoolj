@@ -1,3 +1,6 @@
+#_(asm abs "abs.gcc")
+#_(asm distance "distance.gcc")
+(asm % "mod.gcc")
 (asm nth "nth.gcc")
 
 (step [state world]

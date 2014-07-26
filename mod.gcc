@@ -1,0 +1,8 @@
+LD 0 0 ; (x - ((x / y) * y)) #% #mod
+LD 0 0
+LD 0 1 ; load y
+DIV
+LD 0 1
+MUL
+SUB
+RTN

@@ -1,0 +1,8 @@
+LD 0 0 ; x >= 0 ? x : -1 * x #abs
+LD 0 0 ; load x for compare
+LDC 0
+CGTE ; if x >= 0
+TSEL @abs-pos @abs-neg
+LDC -1 ; #abs-neg
+MUL
+RTN ; #abs-pos

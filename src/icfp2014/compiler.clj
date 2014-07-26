@@ -42,9 +42,6 @@
           ([x] [[:ldc 1 "; /"] x [:div "; -"]])
           ([x y] [x y [:div "; /"]]))
 
-   '%   (fn [a b]
-          (concat a a b [[:div "; mod"]] b [[:mul "; mod"] [:sub "; mod"]]))
-
    ;; Comparison ops
 
    '=   (fn [x y] [x y [:ceq "; ="]])

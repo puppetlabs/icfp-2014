@@ -1,30 +1,52 @@
-DUM  2        ; 2 top-level declarations
-LDF  20       ; declare function go
-LDF  10       ; declare function to
-LDF  6        ; main function
-RAP  2        ; load declarations into environment and run main
-RTN           ; final return
-LDC  1
-LD   0 0      ; var go
-AP   1        ; call go(1)
+DUM 4 ; #prelude
+LDF 8 ; load %
+LDF 16 ; load nth
+LDF 29 ; load step
+LDF 48 ; load main
+LDF 48 ; load main
+RAP 4
 RTN
-LD   0 0      ; var n
-LDC  1
+LD 0 0 ; (x - ((x / y) * y)) #% #mod
+LD 0 0
+LD 0 1 ; load y
+DIV
+LD 0 1
+MUL
 SUB
-ST   0 0
-LD   0 0
-DEBUG
-LD   0 0
-LD   1 0      ; var go  <-- HERE
-AP   1        ; call go(n-1)
 RTN
-LD   0 0      ; var n
-LDC  1
-ADD
-ST   0 0
-LD   0 0
-DEBUG
-LD   0 0
-LD   1 1      ; var to <-- AND HERE
-AP   1        ; call to(n+1)
+LD 0 0 ; load list #nth
+LD 0 1 ; load n
+LDC 0
+CGT
+TSEL 21 27
+CDR ; then #nth-recur
+LD 0 1 ; dec n
+LDC 1
+SUB
+LDF 16
+TAP 2
+CAR ; else #nth-base
+RTN
+LD 0 0 ; load var state ; #step
+LD 0 1 ; load var world
+LDC 2
+LD 1 1 ; load fn nth
+AP 2
+LDC 0
+LD 1 1 ; load fn nth
+AP 2
+LDC 1
+LD 1 1 ; load fn nth
+AP 2
+LDC 0
+LD 1 1 ; load fn nth
+AP 2
+LDC 4
+LD 1 0 ; load fn %
+AP 2
+CONS
+RTN
+LDC 0 ; #main
+LD 0 2 ; load fn step
+CONS
 RTN
