@@ -16,8 +16,27 @@
            [:add "; inc"]])
    'dec (fn [x]
           [x
-           [:ldc 1 "; inc"]
-           [:sub "; inc"]])})
+           [:ldc 1 "; dec"]
+           [:sub "; dec"]])})
+
+(defn load-var
+  [vars name]
+  (let [index (.indexOf vars name)]
+    (if-not (neg? index)
+      [:ld 0 index (format "; load var %s" name)])))
+
+(defn load-fn
+  ([fns name]
+   (load-fn 1 fns name))
+  ([frame fns name]
+   (if-let [func (first (filter #(= (:name %) name) fns))]
+     [:ld frame (.indexOf fns func) (format "; load fn %s" name)])))
+
+(defn load-symbol
+  [fns vars name]
+  (if-let [load-stmt (or (load-fn fns name) (load-var vars name))]
+    load-stmt
+    (throw (IllegalArgumentException. (format "Could not find symbol %s" name)))))
 
 (defn compile-form
   [vars fns form]
@@ -31,9 +50,7 @@
     (macros form)
 
     (symbol? form)
-    (if (fns form)
-      [[:ldf form]]
-      [[:ld 0 (.indexOf vars form)]])
+    [(load-symbol fns vars form)]
 
     (vector? form)
     (if (empty? form)
@@ -43,38 +60,35 @@
               (repeat (count form) [:cons])))
 
     (seq? form)
-    (let [[fn-name & args] form
-          evaled-args (mapcat #(compile-form vars fns %) args)]
+    (let [[fn-name & args] form]
       (if (= fn-name 'quote)
         (concat (mapcat #(compile-form vars fns %) (first args))
                 (repeat (dec (count form)) [:cons]))
-        (if (builtins fn-name)
-          (apply (builtins fn-name) evaled-args)
-          (concat
-            ;; Push the args onto the stack
-            evaled-args
-            [[:ldf fn-name]
-             [:ap (count args)]]))))
+        (let [evaled-args (mapcat #(compile-form vars fns %) args)]
+          (if (builtins fn-name)
+            (apply (builtins fn-name) evaled-args)
+            (concat
+              ;; Push the args onto the stack
+              evaled-args
+              [(load-fn fns fn-name)
+               [:ap (count args)]])))))
 
     :else
     (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))))
 
 (defn assign-addresses
   [fns]
-  {:pre [(map? fns)
-         (every? symbol? (keys fns))
-         (every? map? (vals fns))]
+  {:pre [(vector? fns)
+         (every? map? fns)]
    :post [(every? (comp integer? :address) %)]}
-  (let [prelude (fns 'prelude)
-        others (vals (sort (dissoc fns 'prelude)))]
-    (loop [funcs (vec (concat [prelude] others))
-           index 0
-           address 0]
-      (if-let [func (get funcs index)]
-        (do (prn func) (let [new-funcs (update-in funcs [index] assoc :address address)
-              address (+ address (:length func))]
-          (recur new-funcs (inc index) address)))
-        funcs))))
+  (loop [funcs fns
+         index 0
+         address 0]
+    (if-let [func (get funcs index)]
+      (let [new-funcs (update-in funcs [index] assoc :address address)
+                           address (+ address (:length func))]
+                       (recur new-funcs (inc index) address))
+      funcs)))
 
 (defn code->str
   [fn-addrs line]
@@ -93,28 +107,27 @@
   [fns]
   ;; This depends on the initial state we want
   (let [code [[:ldc 0 "; define main"]
-              [:ldf 'step]
+              (load-fn 0 fns 'step)
               [:cons]
               [:rtn]]
         main {:name 'main
               :code code
               :length (count code)}]
-    (assoc fns 'main main)))
+    (conj fns main)))
 
 (defn generate-prelude
   [fns]
-  (let [others (vals (sort (dissoc fns 'main 'step)))
-        loads  (for [func others]
+  (let [loads  (for [func fns]
                  [:ldf (:name func)])
-        code (concat [[:dum (count others) "; define prelude"]]
+        code (concat [[:dum (count fns) "; define prelude"]]
                      loads
                      [[:ldf 'main]
-                      [:rap (count others)]
+                      [:rap (count fns)]
                       [:rtn]])
         prelude {:name 'prelude
               :code code
               :length (count code)}]
-    (assoc fns 'prelude prelude)))
+    (vec (cons prelude fns))))
 
 (defn emit-code
   [fns]
@@ -129,7 +142,7 @@
 (defn compile-function
   [[name args & body :as code] fns]
   {:pre [(list? code)]}
-  (let [fns (assoc fns name {})
+  (let [fns (conj fns {:name name})
         [stmt & stmts] (mapcat #(compile-form args fns %) body)
         code (concat [(conj stmt (format "; define %s" name))]
                      stmts
@@ -144,10 +157,10 @@
    :post [(string? %)]}
   (let [prog (java.io.PushbackReader. (clojure.java.io/reader file))]
     (loop [form (read prog false nil)
-           fns {}]
+           fns []]
       (if form
         (let [func (compile-function form fns)]
-          (recur (read prog false nil) (assoc fns (:name func) func)))
+          (recur (read prog false nil) (conj fns func)))
         (-> fns
             (generate-main)
             (generate-prelude)

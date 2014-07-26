@@ -33,6 +33,32 @@ static const int GHOST2_FRIGHT = 201;
 static const int GHOST3 = 136;
 static const int GHOST3_FRIGHT = 204;
 
+static unsigned int scoreFruit(WorldState &world)
+{
+    vector<unsigned int> fruitPoints = {0, 100, 300, 500, 500, 700, 700, 1000, 1000, 2000, 2000, 3000, 3000, 5000};
+    WorldMap &wm = get<WSMAP>(world);
+    unsigned int level = ((wm.size() * wm[0].size()) + 99) / 100;
+    if (level >= fruitPoints.size()) {
+        return 5000;
+    } else {
+        return fruitPoints[level];
+    }
+}
+
+static unsigned int scoreGhost(unsigned int eaten)
+{
+    switch (eaten) {
+        case 0:
+            return 200;
+        case 1:
+            return 400;
+        case 2:
+            return 800;
+        default:
+            return 1600;
+    }
+}
+
 static string printWorld(WorldState &world)
 {
     string grid;
@@ -47,7 +73,7 @@ static string printWorld(WorldState &world)
     return grid;
 }
 
-static WorldState process(string world_map, string lambda_script)
+static WorldState process(string world_map, const string &lambda_script, const vector<string> &ghost_scripts)
 {
     WorldState world;
     map<char, GridCell> gridCellLookup = {{'#', WALL}, {' ', EMPTY}, {'.', PILL}, {'o', POWER_PILL}, {'%', FRUIT}, {'\\', LAMBDAMAN}, {'=', GHOST}};
@@ -71,18 +97,20 @@ static WorldState process(string world_map, string lambda_script)
 
     assert(printWorld(world) == world_map);
 
-    // Initialize lambda-man.
+    // Initialize lambda-man and ghosts.
     Location lambdaManLoc;
+    vector<GhostStat> &ghosts = get<WSGHOSTS>(world);
     for (size_t i = 0; i < wm.size(); ++i) {
         auto &row = wm[i];
         for (size_t j = 0; j < row.size(); ++j) {
             if (row[j] == LAMBDAMAN) {
                 lambdaManLoc = make_pair(j, i);
-                break;
+            } else if (row[j] == GHOST) {
+                ghosts.push_back(make_tuple(STANDARD, make_pair(j, i), DOWN, 0, make_pair(j, i)));
             }
         }
     }
-    get<WSLAMBDA>(world) = make_tuple(0, lambdaManLoc, UP, 3, 0, LM_MOVE, aiproc::compile_program(lambda_script), Value(), Closure());
+    get<WSLAMBDA>(world) = make_tuple(0, lambdaManLoc, DOWN, 3, 0, LM_MOVE, aiproc::compile_program(lambda_script), Value(), Closure(), 0, lambdaManLoc);
 
     // Initialize no fruit present.
     get<WSFRUIT>(world) = 0;
@@ -107,7 +135,7 @@ static bool isLegalMove(Location &loc, Direction &dir, WorldMap &wm)
 // Input: a world map, Lambda-Man AI script, N Ghost AI scripts
 void LambdaWorld::runWorld(string world_map, string lambda_script, vector<string> ghost_scripts)
 {
-    WorldState world = process(world_map, lambda_script);
+    WorldState world = process(world_map, lambda_script, ghost_scripts);
 
     // setup the main entry point.
     Closure main;
@@ -138,6 +166,8 @@ void LambdaWorld::runWorld(string world_map, string lambda_script, vector<string
                         );
                     })) {
             cout << "Lambda-Man Won" << endl;
+            // All pills eaten, double the score
+            get<LMSCORE>(get<WSLAMBDA>(world)) *= 2;
             break;
         }
 
@@ -149,6 +179,7 @@ void LambdaWorld::runWorld(string world_map, string lambda_script, vector<string
     }
 
     cout << "Game Over" << endl;
+    cout << "Score = " << get<LMSCORE>(get<WSLAMBDA>(world)) << endl;
 }
 
 void LambdaWorld::step(WorldState &world)
@@ -162,6 +193,7 @@ void LambdaWorld::step(WorldState &world)
         //  Pass in current WorldState and AI state, receive move (a Direction) and new AI state
 
         // Evaluate all Lambda-Man and ghost moves for the current tick.
+        auto &fruitLife = get<WSFRUIT>(world);
         auto &lmStep = get<LMSTEP>(lambdaMan);
         Location &lambdaManLoc = get<LMLOC>(lambdaMan);
         if (lmStep == 0) {
@@ -181,21 +213,48 @@ void LambdaWorld::step(WorldState &world)
                 cout << "Lambda-Man's location[" << get<WSUTC>(world) << "] (" << lambdaManLoc.first;
                 cout << ", " << lambdaManLoc.second << ")" << endl;
             }
-            lmStep = LM_MOVE;
             stop = true;
+
+            // Based on the FAQ, movement is determined before fruit appears, so determine speed here.
+            switch (wm[lambdaManLoc.second][lambdaManLoc.first]) {
+                case PILL:
+                case POWER_PILL:
+                    lmStep = LM_EATING;
+                    break;
+                case FRUIT:
+                    if (fruitLife > 0) {
+                        lmStep = LM_EATING;
+                        break;
+                    }
+                    // Intentional fall-through
+                default:
+                    lmStep = LM_MOVE;
+                    break;
+            }
         }
+        // TODO: Determine ghost moves.
 
         // Actions (fright mode deactivating, fruit appearing/disappearing)
         auto &lambdaManVitality = get<LMVIT>(lambdaMan);
         if (lambdaManVitality > 0) {
             --lambdaManVitality;
         }
-        // TODO: Enable fruit at correct UTC time
-        auto &fruitLife = get<WSFRUIT>(world);
+        if (lambdaManVitality == 0) {
+            for (auto &g : get<WSGHOSTS>(world)) {
+                get<GSVIT>(g) = STANDARD;
+            }
+        }
+
+        // Enable fruit at correct UTC time
+        auto &utc = get<WSUTC>(world);
         if (fruitLife > 0) {
             --fruitLife;
+        } else if (utc >= FRUIT1_APPEAR && utc <= FRUIT1_EXPIRE) {
+            fruitLife = FRUIT1_EXPIRE - utc;
+        } else if (utc >= FRUIT2_APPEAR && utc <= FRUIT2_EXPIRE) {
+            fruitLife = FRUIT2_EXPIRE - utc;
         }
-        // TODO: Ghosts
+
 
         // Check if Lambda-Man is occupying the same square as pills, power pills, or fruit
         // Will only do anything if Lambda-Man moved this tick.
@@ -205,37 +264,59 @@ void LambdaWorld::step(WorldState &world)
             case PILL:
                 //  If pill, pill eaten and removed from game
                 lambdaMansCell = EMPTY;
-                //score += 
-                lmStep = LM_EATING;
+                score += 10;
                 break;
             case POWER_PILL:
                 //  If power pill, power pill eaten and removed from game, fright mode activated
                 lambdaMansCell = EMPTY;
-                //score +=
-                //lambdaManVitality +=
-                lmStep = LM_EATING;
+                score += 50;
+                lambdaManVitality += FRIGHT_DURATION;
+                get<LMEATEN>(lambdaMan) = 0;
+
+                // Set all ghosts to FRIGHT-mode.
+                for (auto &g : get<WSGHOSTS>(world)) {
+                    get<GSVIT>(g) = FRIGHT;
+                }
                 break;
             case FRUIT:
                 //  If fruit is active, fruit eaten and removed from game
                 if (fruitLife > 0) {
-                    //score +=
-                    lmStep = LM_EATING;
+                    score += scoreFruit(world);
+                    fruitLife = 0;
                 }
-                fruitLife = 0;
                 break;
                 // Else do nothing
             default:
                 break;
         }
 
-        // TODO
         // If ghost and Lambda-man occupy square
         //  If fright_mode, Lambda-Man eats ghost; move ghost
         //  Else, Lambda-Man loses life; move Lambda-Man
-        //--get<LMLIVES>(lambdaMan);
+        for (auto &g : get<WSGHOSTS>(world)) {
+            Location &loc = get<GSLOC>(g);
+            if (loc == lambdaManLoc && get<GSVIT>(g) != INVISIBLE) {
+                if (lambdaManVitality > 0) {
+                    assert(get<GSVIT>(g) == FRIGHT);
+                    score += scoreGhost(get<LMEATEN>(lambdaMan));
+                    // Increment number eaten.
+                    ++get<LMEATEN>(lambdaMan);
+                    // TODO: Return ghost to its starting position.
+                    get<GSVIT>(g) = INVISIBLE;
+                    get<GSLOC>(g) = get<GSSTART>(g);
+                } else {
+                    --get<LMLIVES>(lambdaMan);
+                    // Return all entities to starting positions.
+                    get<LMLOC>(lambdaMan) = get<LMSTART>(lambdaMan);
+                    for (auto &gh : get<WSGHOSTS>(world)) {
+                        get<GSLOC>(gh) = get<GSSTART>(gh);
+                    }
+                }
+                break;
+            }
+        }
 
         // Increment ticks in for loop
-        // TODO: Countdown
         --lmStep;
         ++get<WSUTC>(world);
         if (get<WSUTC>(world) >= get<WSEOL>(world)) {
