@@ -1,14 +1,30 @@
-DUM 0 ; define prelude
-LDF 4 ; load function main
-RAP 0
+DUM  2        ; 2 top-level declarations
+LDF  20       ; declare function go
+LDF  10       ; declare function to
+LDF  6        ; main function
+RAP  2        ; load declarations into environment and run main
+RTN           ; final return
+LDC  1
+LD   0 0      ; var go
+AP   1        ; call go(1)
 RTN
-LDC 0 ; define main
-LDF 8 ; load function step
-CONS
+LD   0 0      ; var n
+LDC  1
+SUB
+ST   0 0
+LD   0 0
+DEBUG
+LD   0 0
+LD   1 0      ; var go  <-- HERE
+AP   1        ; call go(n-1)
 RTN
-LD 0 0 ; define step
-LDC 1 ; inc
-ADD ; inc
-LDC 1 ; right
-CONS
+LD   0 0      ; var n
+LDC  1
+ADD
+ST   0 0
+LD   0 0
+DEBUG
+LD   0 0
+LD   1 1      ; var to <-- AND HERE
+AP   1        ; call to(n+1)
 RTN

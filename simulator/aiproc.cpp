@@ -34,11 +34,74 @@ namespace insn {
 
   Instruction add() {
     return [](State* state) {
-      auto val1 = boost::get<int32_t>(state->data_stack.back());
-      state->data_stack.pop_back();
       auto val2 = boost::get<int32_t>(state->data_stack.back());
       state->data_stack.pop_back();
-      state->data_stack.push_back(val1+val2);
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 + val2;
+    };
+  }
+
+  Instruction sub() {
+    return [](State* state) {
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 - val2;
+    };
+  }
+
+  Instruction mul() {
+    return [](State* state) {
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 * val2;
+    };
+  }
+
+  Instruction div() {
+    return [](State* state) {
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 / val2;
+    };
+  }
+
+  Instruction ceq() {
+    return [](State* state) {
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 == val2 ? 1 : 0;
+    };
+  }
+
+  Instruction cgt() {
+    return [](State* state) {
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 > val2 ? 1 : 0;
+    };
+  }
+
+  Instruction cgte() {
+    return [](State* state) {
+      auto val2 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      auto val1 = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.back() = val1 >= val2 ? 1 : 0;
+    };
+  }
+
+  Instruction atom() {
+    return [](State* state) {
+      auto val = state->data_stack.back();
+      if(val.type() == typeid(int32_t))
+	state->data_stack.back() = 1;
+      else
+	state->data_stack.back() = 0;
     };
   }
 
@@ -47,9 +110,38 @@ namespace insn {
       auto val1 = state->data_stack.back();
       state->data_stack.pop_back();
       auto val0 = state->data_stack.back();
-      state->data_stack.pop_back();
+      state->data_stack.back() = Pair::create(state, val0, val1);
+    };
+  }
 
-      state->data_stack.push_back(Pair::create(state, val0, val1));
+  Instruction car() {
+    return [](State* state) {
+      auto val = boost::get<Pair::ptr>(state->data_stack.back());
+      state->data_stack.back() = val->car;
+    };
+  }
+
+  Instruction cdr() {
+    return [](State* state) {
+      auto val = boost::get<Pair::ptr>(state->data_stack.back());
+      state->data_stack.back() = val->cdr;
+    };
+  }
+
+  Instruction sel(counter t, counter f) {
+    return [t, f](State* state) {
+      auto cond = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      state->control_stack.push_back(state->program+1);
+      state->program = cond ? t : f;
+    };
+  }
+
+  Instruction join() {
+    return [](State* state) {
+      auto addr = boost::get<counter>(state->control_stack.back());
+      state->control_stack.pop_back();
+      state->program = addr;
     };
   }
 
@@ -62,13 +154,13 @@ namespace insn {
     };
   }
 
-  Instruction ap(int32_t count) {
-    return [count](State* state) {
+  Instruction ap(int32_t arg_count) {
+    return [arg_count](State* state) {
       auto fn = boost::get<Closure>(state->data_stack.back());
       state->data_stack.pop_back();
-      std::vector<Value> args;
-      for(int32_t i = 0; i < count; ++i) {
-	args.push_back(state->data_stack.back());
+      std::vector<Value> args(arg_count);
+      for(int32_t i = arg_count; i ; i--) {
+	args[i-1] = state->data_stack.back();
 	state->data_stack.pop_back();
       }
       auto env = Environment::create(args, fn.environ);
@@ -104,13 +196,87 @@ namespace insn {
 	throw std::runtime_error("Frame Mismatch");
       if(arg_count != state->environment->values.size())
 	throw std::runtime_error("Frame Mismatch");
-      for(int i = 0; i < arg_count; ++i) {
-	state->environment->values[i] = state->data_stack.back();
+      for(int32_t i = arg_count; i; i--) {
+	state->environment->values[i-1] = state->data_stack.back();
 	state->data_stack.pop_back();
       }
       state->control_stack.push_back(state->environment->parent);
       state->control_stack.push_back(state->program+1);
       state->program = fn.address;
+    };
+  }
+
+  Instruction tsel(int32_t t, int32_t f) {
+    return [t, f](State* state) {
+      auto val = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      state->program = val ? t : f;
+    };
+  }
+
+  Instruction tap(int32_t arg_count) {
+    return [arg_count](State* state) {
+      auto fn = boost::get<Closure>(state->data_stack.back());
+      state->data_stack.pop_back();
+      std::vector<Value> args(arg_count);
+      for(int32_t i = arg_count; i; i--) {
+	args[i-1] = state->data_stack.back();
+	state->data_stack.pop_back();
+      }
+      auto env = state->environment;
+      bool need_env = false;
+      while(env) {
+	if(env == fn.environ) {
+	  need_env = true;
+	  break;
+	}
+	env = env->parent;
+      }
+      if(need_env) {
+	state->environment = Environment::create(args, fn.environ);
+      } else {
+	state->environment->values = args;
+      }
+    };
+  }
+
+  Instruction trap(int32_t arg_count) {
+    return [arg_count](State* state) {
+      auto fn = boost::get<Closure>(state->data_stack.back());
+      state->data_stack.pop_back();
+      if(fn.environ != state->environment)
+	throw std::runtime_error("Frame Mismatch");
+      if(arg_count != state->environment->values.size())
+	throw std::runtime_error("Frame Mismatch");
+      for(int32_t i = arg_count; i; i--) {
+	state->environment->values[i-1] = state->data_stack.back();
+	state->data_stack.pop_back();
+      }
+      state->program = fn.address;
+    };
+  }
+
+  Instruction st(int32_t ctx, int32_t id) {
+    return [ctx, id](State* state) {
+      auto context = ctx;
+      auto env = state->environment;
+      while(context--) {
+	env = env->parent;
+	if(!env)
+	  throw std::runtime_error("Tried to st to a non-existent scope!");
+      }
+      if(id >= env->values.size())
+	throw std::runtime_error("Tried to st to a non-existent value!");
+      env->values[id] = state->data_stack.back();
+      state->data_stack.pop_back();
+    };
+  }
+
+  Instruction debug() {
+    return [](State* state) {
+      auto val = boost::get<int32_t>(state->data_stack.back());
+      state->data_stack.pop_back();
+      std::cout << val << std::endl;
     };
   }
 
@@ -130,25 +296,37 @@ namespace insn {
       arg1 = atoi(tokens[2].c_str());
 
     std::transform(opcode.begin(), opcode.end(), opcode.begin(), ::tolower);
-    if(opcode == "ldc")
-      return ldc(arg0);
-    if(opcode == "ld")
-      return ld(arg0, arg1);
-    if(opcode == "add")
-      return add();
-    else if(opcode == "cons")
-      return cons();
-    else if(opcode == "ldf")
-      return ldf(arg0);
-    else if(opcode == "ap")
-      return ap(arg0);
-    else if(opcode == "rtn")
-      return rtn();
-    else if(opcode == "dum")
-      return dum(arg0);
-    else if(opcode == "rap")
-      return rap(arg0);
-    else
+
+
+#define OPCODE0(op) if(opcode == #op) return op(); else
+#define OPCODE1(op) if(opcode == #op) return op(arg0); else
+#define OPCODE2(op) if(opcode == #op) return op(arg0, arg1); else
+
+    OPCODE1(ldc)
+    OPCODE2(ld)
+    OPCODE0(add)
+    OPCODE0(sub)
+    OPCODE0(mul)
+    OPCODE0(div)
+    OPCODE0(ceq)
+    OPCODE0(cgt)
+    OPCODE0(cgte)
+    OPCODE0(atom)
+    OPCODE0(cons)
+    OPCODE0(car)
+    OPCODE0(cdr)
+    OPCODE2(sel)
+    OPCODE0(join)
+    OPCODE1(ldf)
+    OPCODE1(ap)
+    OPCODE0(rtn)
+    OPCODE1(dum)
+    OPCODE1(rap)
+    OPCODE2(tsel)
+    OPCODE1(tap)
+    OPCODE1(trap)
+    OPCODE2(st)
+    OPCODE0(debug)
       throw std::runtime_error("Unknown opcode: " + opcode);
   }
 }
