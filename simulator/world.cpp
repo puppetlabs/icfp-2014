@@ -115,11 +115,10 @@ void LambdaWorld::runWorld(string world_map, string lambda_script, vector<string
     main_args.push_back(0); // world_state
     main_args.push_back(0); // UNKNOWN
     main.address = 0;
-    main.environ = Environment::create(main_args, nullptr);
 
     // Run the main program to get the initial AI state and
     // our tick function
-    auto result = get<LMPROC>(get<WSLAMBDA>(world)).run(main);
+    auto result = get<LMPROC>(get<WSLAMBDA>(world)).run(main, main_args);
     get<LMSTATE>(get<WSLAMBDA>(world)) = result->car;
     get<LMFUNC>(get<WSLAMBDA>(world)) = boost::get<Closure>(result->cdr);
 
@@ -167,9 +166,10 @@ void LambdaWorld::step(WorldState &world)
         Location &lambdaManLoc = get<LMLOC>(lambdaMan);
         if (lmStep == 0) {
 
-            get<LMFUNC>(lambdaMan).environ->values.push_back(get<LMSTATE>(lambdaMan));
-            get<LMFUNC>(lambdaMan).environ->values.push_back(0); // world state
-            auto result = get<LMPROC>(lambdaMan).run(get<LMFUNC>(lambdaMan));
+            vector<Value> tick_args;
+            tick_args.push_back(get<LMSTATE>(lambdaMan));
+            tick_args.push_back(0); // world state
+            auto result = get<LMPROC>(lambdaMan).run(get<LMFUNC>(lambdaMan), tick_args);
             get<LMFUNC>(lambdaMan).environ->values.clear(); // clear function args after call.
             get<LMSTATE>(lambdaMan) = result->car;
             Direction lambdaManDir = static_cast<Direction>(boost::get<int32_t>(result->cdr));
