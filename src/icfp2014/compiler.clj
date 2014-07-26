@@ -76,37 +76,35 @@
     :else
     (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))))
 
-(defn assign-addresses
-  [fns]
-  {:pre [(vector? fns)
-         (every? map? fns)]
-   :post [(every? (comp integer? :address) %)]}
-  (loop [funcs fns
-         index 0
-         address 0]
-    (if-let [func (get funcs index)]
-      (let [new-funcs (update-in funcs [index] assoc :address address)
-                           address (+ address (:length func))]
-                       (recur new-funcs (inc index) address))
-      funcs)))
+(defn resolve-references
+  [lines]
+  {:pre [(sequential? lines)
+         (every? string? lines)]
+   :post [(sequential? %)
+          (every? string? %)]}
+  (let [label-address (fn [index line]
+                        (if-let [label (last (first (re-seq #"#(\S+)" line)))]
+                          [label (str index)]))
+        labels (->> lines
+                    (map-indexed label-address)
+                    (remove nil?)
+                    (into {}))
+        resolve-label #(get labels (last %) (last %))]
+    (for [line lines]
+      (clojure.string/replace line #"@(\S+)" resolve-label))))
 
 (defn code->str
   [fn-addrs line]
   {:pre [(map? fn-addrs)]
    :post [(string? %)]}
   (condp = (first line)
-    :ldf
-    (format "LDF %d ; load function %s"
-            (fn-addrs (second line))
-            (second line))
-
     (let [[op & args] line]
       (string/join " " (cons (string/upper-case (name op)) args)))))
 
 (defn generate-main
   [fns]
   ;; This depends on the initial state we want
-  (let [code [[:ldc 0 "; define main"]
+  (let [code [[:ldc 0 "; #main"]
               (load-fn 0 fns 'step)
               [:cons]
               [:rtn]]
@@ -118,10 +116,10 @@
 (defn generate-prelude
   [fns]
   (let [loads  (for [func fns]
-                 [:ldf (:name func)])
-        code (concat [[:dum (count fns) "; define prelude"]]
+                 [:ldf (format "@%s" (:name func))])
+        code (concat [[:dum (count fns) "; #prelude"]]
                      loads
-                     [[:ldf 'main]
+                     [[:ldf "@main"]
                       [:rap (count fns)]
                       [:rtn]])
         prelude {:name 'prelude
@@ -133,18 +131,17 @@
   [fns]
   {:pre [(sequential? fns)
          (every? map? fns)]
-   :post [(string? %)]}
+   :post [(every? string? %)]}
   (let [fn-addrs (into {} (map (juxt :name :address) fns))]
     (->> (mapcat :code fns)
-         (map #(code->str fn-addrs %))
-         (string/join "\n"))))
+         (map #(code->str fn-addrs %)))))
 
 (defn compile-function
   [[name args & body :as code] fns]
   {:pre [(list? code)]}
   (let [fns (conj fns {:name name})
         [stmt & stmts] (mapcat #(compile-form args fns %) body)
-        code (concat [(conj stmt (format "; define %s" name))]
+        code (concat [(conj stmt (format "; #%s" name))]
                      stmts
                      [[:rtn]])]
     {:name name
@@ -164,5 +161,6 @@
         (-> fns
             (generate-main)
             (generate-prelude)
-            (assign-addresses)
-            (emit-code))))))
+            (emit-code)
+            (resolve-references)
+            (#(string/join "\n" %)))))))
