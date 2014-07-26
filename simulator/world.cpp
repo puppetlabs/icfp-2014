@@ -33,6 +33,18 @@ static const int GHOST2_FRIGHT = 201;
 static const int GHOST3 = 136;
 static const int GHOST3_FRIGHT = 204;
 
+static unsigned int scoreFruit(WorldState &world)
+{
+    vector<unsigned int> fruitPoints = {0, 100, 300, 500, 500, 700, 700, 1000, 1000, 2000, 2000, 3000, 3000, 5000};
+    WorldMap &wm = get<WSMAP>(world);
+    unsigned int level = ((wm.size() * wm[0].size()) + 99) / 100;
+    if (level >= fruitPoints.size()) {
+        return 5000;
+    } else {
+        return fruitPoints[level];
+    }
+}
+
 static string printWorld(WorldState &world)
 {
     string grid;
@@ -149,6 +161,7 @@ void LambdaWorld::runWorld(string world_map, string lambda_script, vector<string
     }
 
     cout << "Game Over" << endl;
+    cout << "Score = " << get<LMSCORE>(get<WSLAMBDA>(world)) << endl;
 }
 
 void LambdaWorld::step(WorldState &world)
@@ -190,10 +203,15 @@ void LambdaWorld::step(WorldState &world)
         if (lambdaManVitality > 0) {
             --lambdaManVitality;
         }
-        // TODO: Enable fruit at correct UTC time
+        // Enable fruit at correct UTC time
         auto &fruitLife = get<WSFRUIT>(world);
+        auto &utc = get<WSUTC>(world);
         if (fruitLife > 0) {
             --fruitLife;
+        } else if (utc >= FRUIT1_APPEAR && utc <= FRUIT1_EXPIRE) {
+            fruitLife = FRUIT1_EXPIRE - utc;
+        } else if (utc >= FRUIT2_APPEAR && utc <= FRUIT2_EXPIRE) {
+            fruitLife = FRUIT2_EXPIRE - utc;
         }
         // TODO: Ghosts
 
@@ -205,20 +223,20 @@ void LambdaWorld::step(WorldState &world)
             case PILL:
                 //  If pill, pill eaten and removed from game
                 lambdaMansCell = EMPTY;
-                //score += 
+                score += 10;
                 lmStep = LM_EATING;
                 break;
             case POWER_PILL:
                 //  If power pill, power pill eaten and removed from game, fright mode activated
                 lambdaMansCell = EMPTY;
-                //score +=
-                //lambdaManVitality +=
+                score += 50;
+                lambdaManVitality += FRIGHT_DURATION;
                 lmStep = LM_EATING;
                 break;
             case FRUIT:
                 //  If fruit is active, fruit eaten and removed from game
                 if (fruitLife > 0) {
-                    //score +=
+                    score += scoreFruit(world);
                     lmStep = LM_EATING;
                 }
                 fruitLife = 0;
@@ -235,7 +253,6 @@ void LambdaWorld::step(WorldState &world)
         //--get<LMLIVES>(lambdaMan);
 
         // Increment ticks in for loop
-        // TODO: Countdown
         --lmStep;
         ++get<WSUTC>(world);
         if (get<WSUTC>(world) >= get<WSEOL>(world)) {
