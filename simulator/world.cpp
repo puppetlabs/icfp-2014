@@ -193,6 +193,7 @@ void LambdaWorld::step(WorldState &world)
         //  Pass in current WorldState and AI state, receive move (a Direction) and new AI state
 
         // Evaluate all Lambda-Man and ghost moves for the current tick.
+        auto &fruitLife = get<WSFRUIT>(world);
         auto &lmStep = get<LMSTEP>(lambdaMan);
         Location &lambdaManLoc = get<LMLOC>(lambdaMan);
         if (lmStep == 0) {
@@ -212,8 +213,24 @@ void LambdaWorld::step(WorldState &world)
                 cout << "Lambda-Man's location[" << get<WSUTC>(world) << "] (" << lambdaManLoc.first;
                 cout << ", " << lambdaManLoc.second << ")" << endl;
             }
-            lmStep = LM_MOVE;
             stop = true;
+
+            // Based on the FAQ, movement is determined before fruit appears, so determine speed here.
+            switch (wm[lambdaManLoc.second][lambdaManLoc.first]) {
+                case PILL:
+                case POWER_PILL:
+                    lmStep = LM_EATING;
+                    break;
+                case FRUIT:
+                    if (fruitLife > 0) {
+                        lmStep = LM_EATING;
+                        break;
+                    }
+                    // Intentional fall-through
+                default:
+                    lmStep = LM_MOVE;
+                    break;
+            }
         }
         // TODO: Determine ghost moves.
 
@@ -229,7 +246,6 @@ void LambdaWorld::step(WorldState &world)
         }
 
         // Enable fruit at correct UTC time
-        auto &fruitLife = get<WSFRUIT>(world);
         auto &utc = get<WSUTC>(world);
         if (fruitLife > 0) {
             --fruitLife;
@@ -249,14 +265,12 @@ void LambdaWorld::step(WorldState &world)
                 //  If pill, pill eaten and removed from game
                 lambdaMansCell = EMPTY;
                 score += 10;
-                lmStep = LM_EATING;
                 break;
             case POWER_PILL:
                 //  If power pill, power pill eaten and removed from game, fright mode activated
                 lambdaMansCell = EMPTY;
                 score += 50;
                 lambdaManVitality += FRIGHT_DURATION;
-                lmStep = LM_EATING;
                 get<LMEATEN>(lambdaMan) = 0;
 
                 // Set all ghosts to FRIGHT-mode.
@@ -268,9 +282,8 @@ void LambdaWorld::step(WorldState &world)
                 //  If fruit is active, fruit eaten and removed from game
                 if (fruitLife > 0) {
                     score += scoreFruit(world);
-                    lmStep = LM_EATING;
+                    fruitLife = 0;
                 }
-                fruitLife = 0;
                 break;
                 // Else do nothing
             default:
