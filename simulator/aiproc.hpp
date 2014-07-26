@@ -9,6 +9,7 @@ namespace aiproc {
   using boost::recursive_wrapper;
 
   struct Pair;
+  struct Environment;
   struct State;
   struct Closure;
 
@@ -18,15 +19,11 @@ namespace aiproc {
   using Value = boost::variant<
     int32_t,
     boost::recursive_wrapper<Closure>,
-    std::shared_ptr<Pair> >;
+    std::shared_ptr<Pair>,
+    std::shared_ptr<Environment>,
+    Instruction,
+    counter >;
 
-  /*  struct Instruction {
-    Value arg0;
-    Value arg1;
-
-    std::function<void(State*)> exec;
-    }; */
-  
   struct Pair {
     using ptr = std::shared_ptr<Pair>;
     Value car;
@@ -59,14 +56,18 @@ namespace aiproc {
   };
 
   struct State {
-    std::vector<Value> stack;
-    std::vector<counter> control;
+    // Stacks and registers, as defined in the spec
     std::vector<Instruction> code;
-    std::vector<Environment::ptr> environment;
-    size_t cell_count=0;
+    std::vector<Value> data_stack;
+    std::vector<Value> control_stack;
     counter program;
+    Environment::ptr environment;
 
-    Pair::ptr run(Closure start);
+    // The number of cons cells in this machine.
+    // Only 10 million are allowed.
+    size_t cell_count=0;    
+
+    Pair::ptr run(Closure start, std::vector<Value> args);
   };
 
   State compile_program(std::string);
