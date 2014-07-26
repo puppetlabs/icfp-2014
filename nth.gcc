@@ -1,0 +1,13 @@
+LD 0 0 ; load list #nth
+LD 0 1 ; load n
+LDC 0
+CGT
+TSEL @nth-recur @nth-base
+CDR ; then #nth-recur
+LD 0 1 ; dec n
+LDC 1
+SUB
+LDF @nth
+TAP 2
+CAR ; else #nth-base
+RTN

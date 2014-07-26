@@ -7,7 +7,8 @@
   {'up    [[:ldc 0 "; up"]]
    'right [[:ldc 1 "; right"]]
    'down  [[:ldc 2 "; down"]]
-   'left  [[:ldc 3 "; left"]]})
+   'left  [[:ldc 3 "; left"]]
+   })
 
 (def builtins
   {
@@ -40,6 +41,9 @@
    '/   (fn
           ([x] [[:ldc 1 "; /"] x [:div "; -"]])
           ([x y] [x y [:div "; /"]]))
+
+   '%   (fn [a b]
+          (concat a a b [[:div "; mod"]] b [[:mul "; mod"] [:sub "; mod"]]))
 
    ;; Comparison ops
 
@@ -108,12 +112,12 @@
       (if (= fn-name 'quote)
         (concat (mapcat #(compile-form vars fns %) (first args))
                 (repeat (dec (count form)) [:cons]))
-        (let [evaled-args (mapcat #(compile-form vars fns %) args)]
+        (let [evaled-args (map #(compile-form vars fns %) args)]
           (if (builtins fn-name)
             (apply (builtins fn-name) evaled-args)
             (concat
               ;; Push the args onto the stack
-              evaled-args
+              (apply concat evaled-args)
               [(load-fn fns fn-name)
                [:ap (count args)]])))))
 
@@ -138,10 +142,10 @@
       (clojure.string/replace line #"@(\S+)" resolve-label))))
 
 (defn code->str
-  [fn-addrs line]
-  {:pre [(map? fn-addrs)]
-   :post [(string? %)]}
-  (condp = (first line)
+  [line]
+  {:post [(string? %)]}
+  (if (string? line)
+    line
     (let [[op & args] line]
       (string/join " " (cons (string/upper-case (name op)) args)))))
 
@@ -160,10 +164,10 @@
 (defn generate-prelude
   [fns]
   (let [loads  (for [func fns]
-                 [:ldf (format "@%s" (:name func))])
+                 [:ldf (format "@%s ; load %s" (:name func) (:name func))])
         code (concat [[:dum (count fns) "; #prelude"]]
                      loads
-                     [[:ldf "@main"]
+                     [[:ldf "@main ; load main"]
                       [:rap (count fns)]
                       [:rtn]])
         prelude {:name 'prelude
@@ -178,7 +182,14 @@
    :post [(every? string? %)]}
   (let [fn-addrs (into {} (map (juxt :name :address) fns))]
     (->> (mapcat :code fns)
-         (map #(code->str fn-addrs %)))))
+         (map code->str))))
+
+(defn import-asm
+  [fn-name file]
+  (let [code (vec (line-seq (clojure.java.io/reader file)))]
+    {:name fn-name
+     :code code
+     :length (count code)}))
 
 (defn compile-function
   [[name args & body :as code] fns]
@@ -200,7 +211,9 @@
     (loop [form (read prog false nil)
            fns []]
       (if form
-        (let [func (compile-function form fns)]
+        (let [func (if (= (first form) 'asm)
+                     (import-asm (second form) (last form))
+                     (compile-function form fns))]
           (recur (read prog false nil) (conj fns func)))
         (-> fns
             (generate-main)
