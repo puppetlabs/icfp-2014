@@ -1,6 +1,7 @@
 #include "aiproc.hpp"
 
 #include <sstream>
+#include <limits>
 
 static const auto THOUSAND = 1000;
 static const auto MILLION = THOUSAND*THOUSAND;
@@ -12,36 +13,51 @@ namespace insn {
   using namespace aiproc;
   Instruction ldc(int32_t val) {
     return [val](State* state) {
-      state->stack.push_back(val);
+      state->data_stack.push_back(val);
+    };
+  }
+
+  Instruction ld(int32_t ctx, int32_t id) {
+    return [ctx, id](State* state) {
+      auto context = ctx;
+      auto env = state->environment;
+      while(context--) {
+	env = env->parent;
+	if(!env)
+	  throw std::runtime_error("Tried to ld from a non-existent scope!");
+      }
+      if(id >= env->values.size())
+	throw std::runtime_error("Tried to ld from a non-existent value!");
+      state->data_stack.push_back(env->values[id]);
     };
   }
 
   Instruction ldf(counter addr) {
     return [addr](State* state) {
-      auto cur_env = state->environment.back();
       Closure c;
-      c.environ = Environment::create(std::vector<Value>(), cur_env);
+      c.environ = state->environment;
       c.address = addr;
-      state->stack.push_back(c);
+      state->data_stack.push_back(c);
     };
   }
 
   Instruction cons() {
     return [](State* state) {
-      auto val1 = state->stack.back();
-      state->stack.pop_back();
-      auto val0 = state->stack.back();
-      state->stack.pop_back();
+      auto val1 = state->data_stack.back();
+      state->data_stack.pop_back();
+      auto val0 = state->data_stack.back();
+      state->data_stack.pop_back();
 
-      state->stack.push_back(Pair::create(state, val0, val1));
+      state->data_stack.push_back(Pair::create(state, val0, val1));
     };
   }
 
   Instruction rtn() {
     return [](State* state) {
-      state->program = state->control.back();
-      state->control.pop_back();
-      state->environment.pop_back();
+      state->program = boost::get<counter>(state->control_stack.back());
+      state->control_stack.pop_back();
+      state->environment = boost::get<Environment::ptr>(state->control_stack.back());
+      state->control_stack.pop_back();
     };
   }
 
@@ -63,6 +79,8 @@ namespace insn {
     std::transform(opcode.begin(), opcode.end(), opcode.begin(), ::tolower);
     if(opcode == "ldc")
       return ldc(arg0);
+    if(opcode == "ld")
+      return ld(arg0, arg1);
     else if(opcode == "ldf")
       return ldf(arg0);
     else if(opcode == "cons")
@@ -96,7 +114,7 @@ namespace aiproc {
   Environment::Environment(std::vector<Value> values, ptr parent)
     : values(values), parent(parent) {}
 
-  Pair::ptr State::run(Closure start) {
+  Pair::ptr State::run(Closure start, std::vector<Value> args) {
     program = start.address;
 
     // We need to track the number of instructions so we can fail
@@ -107,8 +125,9 @@ namespace aiproc {
     auto max_insns = program ? PROGRAM_TIME : 60 * PROGRAM_TIME;
     decltype(max_insns) executed_insns = 0;
 
-    control.push_back(program);
-    environment.push_back(start.environ);
+    control_stack.push_back(Environment::ptr());
+    control_stack.push_back(std::numeric_limits<counter>::max());
+    environment = Environment::create(args, start.environ);
 
     for(;;) {
       auto pc = program;
@@ -118,7 +137,7 @@ namespace aiproc {
 
       // If control is empty, we've returned from our entry point.
       // It's time to stop execution.
-      if(control.empty())
+      if(control_stack.empty())
 	break;
 
       // We're on a clock.
@@ -127,7 +146,9 @@ namespace aiproc {
     };
 
     // Return value is whatever is on top of the stack.
-    return boost::get<Pair::ptr>(stack.back());
+    auto result = boost::get<Pair::ptr>(data_stack.back());
+    data_stack.pop_back();
+    return result;
   };
 
   State compile_program(std::string prog) {
