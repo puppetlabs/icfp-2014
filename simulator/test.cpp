@@ -3,20 +3,14 @@
 using namespace aiproc;
 
 #include <iostream>
+#include <fstream>
 
 using namespace std;
 
-const char* prog = 
-  "LDC 0\n"
-  "LDF 4\n"
-  "CONS\n"
-  "RTN\n"
-  "LD 0 0\n" // duplicate existing AI state. over and over and over.
-  "LDC 1\n"
-  "CONS\n"
-  "RTN\n";
-
 int main() {
+  std::ifstream stream("../../ai.gcc");
+  std::string prog((std::istreambuf_iterator<char>(stream)),
+		   std::istreambuf_iterator<char>());
   auto processor = aiproc::compile_program(prog);
 
   // setup the main entry point.

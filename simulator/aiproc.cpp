@@ -39,7 +39,7 @@ namespace insn {
       auto val2 = boost::get<int32_t>(state->data_stack.back());
       state->data_stack.pop_back();
       state->data_stack.push_back(val1+val2);
-    }
+    };
   }
 
   Instruction cons() {
@@ -73,7 +73,7 @@ namespace insn {
       }
       auto env = Environment::create(args, fn.environ);
       state->control_stack.push_back(state->environment);
-      state->control_stack.push_back(state->program);
+      state->control_stack.push_back(state->program+1);
       state->environment = env;
       state->program = fn.address;
     };
@@ -109,7 +109,7 @@ namespace insn {
 	state->data_stack.pop_back();
       }
       state->control_stack.push_back(state->environment->parent);
-      state->control_stack.push_back(state->program);
+      state->control_stack.push_back(state->program+1);
       state->program = fn.address;
     };
   }
