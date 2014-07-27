@@ -31,18 +31,18 @@
    '+   (fn
           ([] [[:ldc 0 "; +"]])
           ([& nums]
-             (into [] (concat nums (repeat (dec (count nums)) [:add "; +"])))))
+             (into [] (concat (apply concat nums) (repeat (dec (count nums)) [:add "; +"])))))
    '-   (fn
           ([x] (concat [[:ldc 0 "; -"]] x [[:sub "; -"]]))
           ([x y & nums]
              (into [] (concat
                        x y [[:sub "; -"]]
                        (apply concat (for [num nums]
-                                       [num [:sub "; -"]]))))))
+                                       (concat num [[:sub "; -"]])))))))
    '*   (fn
           ([] [[:ldc 1 "; *"]])
           ([& nums]
-             (into [] (concat nums (repeat (dec (count nums)) [:mul "; *"])))))
+             (into [] (concat (apply concat nums) (repeat (dec (count nums)) [:mul "; *"])))))
    '/   (fn
           ([x] (concat [[:ldc 1 "; /"]] x [[:div "; -"]]))
           ([x y] (concat x y [[:div "; /"]])))
