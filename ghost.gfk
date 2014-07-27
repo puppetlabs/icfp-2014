@@ -1,33 +1,29 @@
-;; INT 0 ; reg A -> ghost's new direction
-;; INT 1 ; lambda-man[x,y] -> [A,B]
-;; INT 3, INT 5 ; this-ghost[x,y] -> [A,B]
-
-JEQ @start,0,0                  ;unconditional jump to start
+JEQ @start,0,0                                   ;unconditional jump to start
 
 ;;; DEFINE "FUNCTIONS"
-MOV A,0                         ;#move-up
+MOV A,0                                          ;#move-up
 INT 0
 HLT
 
-MOV A,1                         ;#move-right
+MOV A,1                                          ;#move-right
 INT 0
 HLT
 
-MOV A,2                         ;#move-down
+MOV A,2                                          ;#move-down
 INT 0
 HLT
 
-MOV A,3                         ;#move-left
+MOV A,3                                          ;#move-left
 INT 0
 HLT
 
 
 ;;; START HERE
-INT 1                           ;[A,B] = [lambda-x,lamda-y] #start
+INT 1                                            ;[A,B] = [lambda-x,lamda-y] #start
 MOV $lambda[x],A
 MOV $lambda[y],B
-INT 3                           ;get this ghost's index
-INT 5                           ;[A,B] = [ghost-x,ghost-y]
+INT 3                                            ;get this ghost's index
+INT 5                                            ;[A,B] = [ghost-x,ghost-y]
 MOV $ghost[x],A
 MOV $ghost[y],B
 
@@ -43,28 +39,28 @@ JGT @if-ghost[x]-bigger,$ghost[x],$lambda[x]
 SUB $lambda[x],$ghost[x]
 MOV $xdist,$lambda[x]
 JEQ @store-y-dist,0,0
-SUB $ghost[x],$lambda[x]        ; else #if-ghost[x]-bigger then A = C - A
+SUB $ghost[x],$lambda[x]                         ; else #if-ghost[x]-bigger then A = C - A
 MOV $xdist,$ghost[x]
 
 ;;; unless $ghost[y] > $lambda[y]
 ;;;   $ydist = $lambda[y] - $ghost[y]
 ;;; else
 ;;;   $ydist = $ghost[y] - $lambda[y]
-JGT @if-ghost[y]-bigger,$ghost[y],$lambda[y] ; #store-y-dist
+JGT @if-ghost[y]-bigger,$ghost[y],$lambda[y]    ; #store-y-dist
 SUB $lambda[y],$ghost[y]
 MOV $ydist,$lambda[y]
 JEQ @choose-move,0,0
-SUB $ghost[y],$lambda[y]        ; else #if-ghost[y]-bigger then A = C - A
+SUB $ghost[y],$lambda[y]                        ; else #if-ghost[y]-bigger then A = C - A
 MOV $ydist,$ghost[y]
 JEQ @choose-move,0,0
 
 ;;; MORE FUNCTIONS
-JGT @move-left,$ghost[x],$lambda[x] ; #move-x
+JGT @move-left,$ghost[x],$lambda[x]             ; #move-x
 JEQ @move-right,0,0
 
-JGT @move-up,$ghost[y],$lambda[y]   ; #move-y
+JGT @move-up,$ghost[y],$lambda[y]               ; #move-y
 JEQ @move-down,0,0
 
 ;;; CHOOSE YOUR MOVE
-JGT @move-x,$xdist,$ydist       ;if x-dist > y-dist then move-x #choose-move
-JEQ @move-y,0,0                 ;else move-y
+JGT @move-x,$xdist,$ydist                       ;if x-dist > y-dist then move-x #choose-move
+JEQ @move-y,0,0                                 ;else move-y
