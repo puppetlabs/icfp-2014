@@ -22,7 +22,7 @@
 (defn attag
   "Return the name of an @tag, if any. Otherwise return nil."
   [line]
-  (last (first (re-seq #"@([a-zA-Z\-]+)" line))))
+  (last (first (re-seq #"@([a-zA-Z\-\[\]]+)" line))))
 
 (defn scan-hashtag
   "Returns a vector of [hashtag line-number] if the line contains a hashtag.
@@ -95,10 +95,15 @@
 (defn tag-file
   [fin-path fout-path]
   (->> fin-path
-       io/reader
-       line-seq
-       tag-lines
-       var-lines
-       check-length
-       (s/join "\n")
+       tag-file*
        (spit fout-path)))
+
+
+;; TODO:
+;;
+;; * "macro" facilities
+;; ** unconditional jump
+;; ** sub-and-store: A = B - C
+;; ** probably ^^ for add as well
+;;
+;; * "prelude/coda/appendix" of stdlib "funcs"
