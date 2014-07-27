@@ -5,5 +5,6 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [spyscope "0.1.4"]]
+  :motto "What's good is to get these goats for our computer industry!"
 
   :main icfp2014.core)

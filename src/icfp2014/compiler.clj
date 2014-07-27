@@ -1,6 +1,7 @@
 (ns icfp2014.compiler
   (:require [clojure.java.io]
             [clojure.string :as string]
+            [clojure.walk :as walk]
             [spyscope.core :as spy]))
 
 (def ^:dynamic locals (atom []))
@@ -80,6 +81,16 @@
 
    })
 
+(defn fail-on-qualified-symbols
+  [code]
+  (let [fail-fn (fn [form]
+                  (when (and (symbol? form)
+                             (re-find #"/" (str form)))
+                    (throw (IllegalArgumentException.
+                             (format "Found qualified symbol %s" form)))))]
+    (walk/postwalk fail-fn code)
+    true))
+
 (defn tag-with
   [label [stmt & stmts]]
   {:pre [(vector? stmt)
@@ -149,7 +160,8 @@
             then-codes (compile-form vars fns then)
             else-codes (if else
                          (compile-form vars fns else)
-                         (throw (IllegalArgumentException. (format "No else clause specified for %s" form))))
+                         (compile-form vars fns 0))
+
             pred-label (gensym (str fn-name "-pred"))
             then-label (gensym (str fn-name "-then"))
             else-label (gensym (str fn-name "-else"))]
@@ -262,7 +274,8 @@
 
 (defn compile-function
   [[name args & body :as code] fns]
-  {:pre [(list? code)]
+  {:pre [(list? code)
+         (fail-on-qualified-symbols code)]
    :post [(vector? (:code %))
           (every? vector? (:code %))]}
   (binding [locals (atom [])]
@@ -292,7 +305,7 @@
       (if form
         (let [func (if (= (first form) 'asm)
                      (import-asm (second form) (last form))
-                     (compile-function form fns))]
+                     (compile-function (walk/macroexpand-all form) fns))]
           (recur (read prog false nil) (conj fns func)))
         (-> fns
             (generate-main)
