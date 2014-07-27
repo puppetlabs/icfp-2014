@@ -179,16 +179,13 @@
                [:st 0 (.indexOf @locals x) (format "; store %s" x)]
                (load-local xs-sym)
                [:cdr]
-               [:st 0 (.indexOf @locals xs-sym) (format "; store %s" xs-sym)]]
-
-              (compile-form vars fns body)
+               [:st 0 (.indexOf @locals x) (format "; store %s" x)]
+               (compile-form vars fns body)]
 
               (tag-with cond-tag [(load-local xs-sym)])
-              [[:atom]
-               [:tsel (str "@" done-tag) (str "@" loop-tag)]]
-
-              (tag-with loop-tag [[:ldc 0]])
-              [[:sel (str "@" body-tag) (str "@" body-tag)]
+              [[:cdr]
+               [:atom]
+               [:sel (str "@" done-tag) (str "@" body-tag)]
                [:cons]
                [:join]]
 
@@ -262,7 +259,7 @@
   (let [code [[:ldc 0 "; #main"]
               (load-fn 0 'step)
               [:cons]
-              [:rtn]]
+              [:rtn "; end main"]]
         main {:name 'main
               :code code
               :length (count code)}]
@@ -276,7 +273,7 @@
                      loads
                      [[:ldf "@main ; load main"]
                       [:rap (count fns)]
-                      [:rtn]])
+                      [:rtn "; end prelude"]])
         prelude {:name 'prelude
               :code code
               :length (count code)}]
@@ -310,7 +307,7 @@
           code (->> body
                     (mapcat #(compile-form args fns %))
                     (tag-with localname))
-          code (concat code [[:rtn]])
+          code (concat code [[:rtn (str "; end " name)]])
           num-locals (count @locals)
           local-scope (concat [[:dum num-locals]]
                        (vec (repeatedly num-locals #(identity [:ldc 0])))
