@@ -3,14 +3,14 @@ CAR ; x1
 LD 0 1
 CAR ; x2
 SUB ; x1 - x2
-LDF @abs ; |x1 - x2|
+LD 0 ^abs ; |x1 - x2|
 AP 1
 LD 0 0
 CDR ; y1
 LD 0 1
 CDR ; y2
 SUB ; y1 - y2
-LDF @abs ; |y1 - y2|
+LD 0 ^abs ; |y1 - y2|
 AP 1
 ADD
 RTN
