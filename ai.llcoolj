@@ -1,7 +1,13 @@
-#_(asm abs "abs.gcc")
-#_(asm distance "distance.gcc")
+(asm abs "abs.gcc")
+(asm distance "distance.gcc")
 (asm % "mod.gcc")
 (asm nth "nth.gcc")
 
+(world-map [world]
+  (car world))
+
+(look-at [world pair]
+  (nth (nth (world-map world) (cdr pair)) (car pair)))
+
 (step [state world]
-  '(state (% (nth (nth (nth (nth world 2) 0) 1) 0) 4)))
+  '(state (% (look-at world (nth (nth (nth world 2) 0) 1)) 4)))

@@ -62,6 +62,16 @@
            [:ldc 0 "; <="]
            [:ceq "; <="]])
 
+   ;; cons ops
+   'car (fn [cons]
+          (concat cons [[:car]]))
+
+   'cdr (fn [cons]
+          (concat cons [[:cdr]]))
+
+   'cons (fn [car cdr]
+           (concat car cdr [[:cons]]))
+
    })
 
 (defn load-var

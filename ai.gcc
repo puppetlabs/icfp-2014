@@ -1,10 +1,40 @@
-DUM 4 ; #prelude
-LDF 8 ; load %
-LDF 16 ; load nth
-LDF 29 ; load step
-LDF 48 ; load main
-LDF 48 ; load main
-RAP 4
+DUM 10 ; #prelude
+LDF 14 ; load abs
+LDF 22 ; load distance
+LDF 38 ; load %
+LDF 46 ; load nth
+LDF 59 ; load first
+LDF 64 ; load rest
+LDF 69 ; load world-map
+LDF 73 ; load look-at
+LDF 87 ; load step
+LDF 106 ; load main
+LDF 106 ; load main
+RAP 10
+RTN
+LD 0 0 ; x >= 0 ? x : -1 * x #abs
+LD 0 0 ; load x for compare
+LDC 0
+CGTE ; if x >= 0
+TSEL 21 19
+LDC -1 ; #abs-neg
+MUL
+RTN ; #abs-pos
+LD 0 0 ; |x1 - x2| + |y1 - y2| #distance
+CAR ; x1
+LD 0 1
+CAR ; x2
+SUB ; x1 - x2
+LDF 14 ; |x1 - x2|
+AP 1
+LD 0 0
+CDR ; y1
+LD 0 1
+CDR ; y2
+SUB ; y1 - y2
+LDF 14 ; |y1 - y2|
+AP 1
+ADD
 RTN
 LD 0 0 ; (x - ((x / y) * y)) #% #mod
 LD 0 0
@@ -18,35 +48,63 @@ LD 0 0 ; load list #nth
 LD 0 1 ; load n
 LDC 0
 CGT
-TSEL 21 27
+TSEL 51 57
 CDR ; then #nth-recur
 LD 0 1 ; dec n
 LDC 1
 SUB
-LDF 16
+LDF 46
 TAP 2
 CAR ; else #nth-base
 RTN
+LD 0 0 ; load var pair ; #first
+LDC 0
+LD 1 3 ; load fn nth
+AP 2
+RTN
+LD 0 0 ; load var pair ; #rest
+LDC 1
+LD 1 3 ; load fn nth
+AP 2
+RTN
+LD 0 0 ; load var world ; #world-map
+LD 1 4 ; load fn first
+AP 1
+RTN
+LD 0 0 ; load var world ; #look-at
+LD 1 6 ; load fn world-map
+AP 1
+LD 0 1 ; load var pair
+LD 1 4 ; load fn first
+AP 1
+LD 1 3 ; load fn nth
+AP 2
+LD 0 1 ; load var pair
+LD 1 5 ; load fn rest
+AP 1
+LD 1 3 ; load fn nth
+AP 2
+RTN
 LD 0 0 ; load var state ; #step
 LD 0 1 ; load var world
+LD 0 1 ; load var world
 LDC 2
-LD 1 1 ; load fn nth
+LD 1 3 ; load fn nth
 AP 2
 LDC 0
-LD 1 1 ; load fn nth
+LD 1 3 ; load fn nth
 AP 2
 LDC 1
-LD 1 1 ; load fn nth
+LD 1 3 ; load fn nth
 AP 2
-LDC 0
-LD 1 1 ; load fn nth
+LD 1 7 ; load fn look-at
 AP 2
 LDC 4
-LD 1 0 ; load fn %
+LD 1 2 ; load fn %
 AP 2
 CONS
 RTN
 LDC 0 ; #main
-LD 0 2 ; load fn step
+LD 0 8 ; load fn step
 CONS
 RTN
