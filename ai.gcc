@@ -31,14 +31,14 @@ CAR ; x1
 LD 0 1
 CAR ; x2
 SUB ; x1 - x2
-LDF 20 ; |x1 - x2|
+LD 0 0 ; |x1 - x2|
 AP 1
 LD 0 0
 CDR ; y1
 LD 0 1
 CDR ; y2
 SUB ; y1 - y2
-LDF 20 ; |y1 - y2|
+LD 0 0 ; |y1 - y2|
 AP 1
 ADD
 RTN
@@ -81,7 +81,7 @@ CONS
 RTN
 LDC 0 ; #to-the
 TSEL 150 150
-LD 0 1 ; load var coord ; #to-the-then18414
+LD 0 1 ; load var coord ; #to-the-then811
 LD 1 8 ; load fn x
 AP 1
 LD 0 1 ; load var coord
@@ -92,9 +92,9 @@ SUB ; dec
 LD 1 6 ; load fn make-coord
 AP 2
 JOIN
-LDC 0 ; #to-the-else18415
+LDC 0 ; #to-the-else812
 TSEL 145 145
-LD 0 1 ; load var coord ; #to-the-then18411
+LD 0 1 ; load var coord ; #to-the-then808
 LD 1 8 ; load fn x
 AP 1
 LDC 1 ; inc
@@ -105,9 +105,9 @@ AP 1
 LD 1 6 ; load fn make-coord
 AP 2
 JOIN
-LDC 0 ; #to-the-else18412
+LDC 0 ; #to-the-else809
 TSEL 140 140
-LD 0 1 ; load var coord ; #to-the-then18408
+LD 0 1 ; load var coord ; #to-the-then805
 LD 1 8 ; load fn x
 AP 1
 LD 0 1 ; load var coord
@@ -118,9 +118,9 @@ ADD ; inc
 LD 1 6 ; load fn make-coord
 AP 2
 JOIN
-LDC 0 ; #to-the-else18409
+LDC 0 ; #to-the-else806
 TSEL 135 135
-LD 0 1 ; load var coord ; #to-the-then18405
+LD 0 1 ; load var coord ; #to-the-then802
 LD 1 8 ; load fn x
 AP 1
 LDC 1 ; dec
@@ -131,24 +131,24 @@ AP 1
 LD 1 6 ; load fn make-coord
 AP 2
 JOIN
-LD 0 1 ; load var coord ; #to-the-else18406
+LDC 0 ; #to-the-else803
 JOIN
-LD 0 0 ; load var dir ; #to-the-pred18404
+LD 0 0 ; load var dir ; #to-the-pred801
 LDC 3 ; left
 CEQ ; =
 SEL 122 133
 JOIN
-LD 0 0 ; load var dir ; #to-the-pred18407
+LD 0 0 ; load var dir ; #to-the-pred804
 LDC 2 ; down
 CEQ ; =
 SEL 109 120
 JOIN
-LD 0 0 ; load var dir ; #to-the-pred18410
+LD 0 0 ; load var dir ; #to-the-pred807
 LDC 1 ; right
 CEQ ; =
 SEL 96 107
 JOIN
-LD 0 0 ; load var dir ; #to-the-pred18413
+LD 0 0 ; load var dir ; #to-the-pred810
 LDC 0 ; up
 CEQ ; =
 SEL 83 94
@@ -187,11 +187,11 @@ RTN
 LD 0 0 ; load var state ; #step
 LDC 0
 TSEL 193 193
-LDC 1 ; right ; #step-then18417
+LDC 1 ; right ; #step-then814
 JOIN
-LDC 3 ; left ; #step-else18418
+LDC 3 ; left ; #step-else815
 JOIN
-LD 0 1 ; load var world ; #step-pred18416
+LD 0 1 ; load var world ; #step-pred813
 LDC 1 ; right
 LD 0 1 ; load var world
 LD 1 5 ; load fn whereami

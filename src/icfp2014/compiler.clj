@@ -1,6 +1,7 @@
 (ns icfp2014.compiler
   (:require [clojure.java.io]
             [clojure.string :as string]
+            [clojure.walk :as walk]
             [spyscope.core :as spy]))
 
 (def macros
@@ -141,7 +142,8 @@
             then-codes (compile-form vars fns then)
             else-codes (if else
                          (compile-form vars fns else)
-                         (throw (IllegalArgumentException. (format "No else clause specified for %s" form))))
+                         (compile-form vars fns 0))
+
             pred-label (gensym (str fn-name "-pred"))
             then-label (gensym (str fn-name "-then"))
             else-label (gensym (str fn-name "-else"))]
@@ -153,6 +155,9 @@
                 [[:join]]
                 (tag-with pred-label pred-codes)
                 [[:sel (str "@" then-label) (str "@" else-label)]]))
+
+      (= (first form) 'cond)
+      (compile-form vars fns (walk/macroexpand-all form))
 
       ;; list declaration
       (= (first form) 'quote)

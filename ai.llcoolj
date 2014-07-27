@@ -13,17 +13,18 @@
   (cons x y))
 
 (to-the [dir coord]
-  (if (= dir up)
+  (cond
+    (= dir up)
     (make-coord (x coord) (dec (y coord)))
-    (if (= dir right)
-      (make-coord (inc (x coord)) (y coord))
-      (if (= dir down)
-        (make-coord (x coord) (inc (y coord)))
-        (if (= dir left)
-          (make-coord (dec (x coord)) (y coord))
-          ;; We have to have an else or the compiler dies. If the direction is
-          ;; invalid, just return the given coord.
-          coord)))))
+
+    (= dir right)
+    (make-coord (inc (x coord)) (y coord))
+
+    (= dir down)
+    (make-coord (x coord) (inc (y coord)))
+
+    (= dir left)
+    (make-coord (dec (x coord)) (y coord))))
 
 (x [coord]
   (col coord))
