@@ -59,6 +59,8 @@
    'cons (fn [car cdr]
            (concat car cdr [[:cons]]))
 
+   'atom? (fn [val]
+            (concat val [[:atom]]))
    })
 
 (defn fail-on-qualified-symbols
@@ -100,7 +102,7 @@
    [:ld frame (format "^%s" name) (format "; load fn %s" name)]))
 
 (defn load-symbol
-  [fns vars name]
+  [vars name]
   {:post [(vector? %)
           (not (some vector? %))]}
   (if-let [load-stmt (or (load-local name) (load-var vars name) (load-fn name))]
@@ -121,7 +123,7 @@
       (macros form)
 
       (symbol? form)
-      [(load-symbol fns vars form)]
+      [(load-symbol vars form)]
 
       (vector? form)
       (if (empty? form)
@@ -137,7 +139,9 @@
       (let [[_ pred then else] form
             fn-name (:name (last fns))
             pred-codes (compile-form vars fns pred)
-            then-codes (compile-form vars fns then)
+            then-codes (if then
+                         (compile-form vars fns then)
+                         (throw (IllegalArgumentException. (format "Why have an if without a then? %s" form))))
             else-codes (if else
                          (compile-form vars fns else)
                          (compile-form vars fns 0))
@@ -177,7 +181,7 @@
           (concat
             ;; Push the args onto the stack
             (apply concat evaled-args)
-            [(load-fn fn-name)
+            [(load-symbol vars fn-name)
              [:ap (count args)]]))))))
 
 (defn resolve-references

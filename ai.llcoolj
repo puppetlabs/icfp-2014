@@ -31,6 +31,11 @@
 (true? [val]
   (not (false? val)))
 
+(empty? [val]
+  (if (atom? val)
+    (zero? val)
+    false))
+
 (pill? [cell]
   ;; "+ is or" -- branan
   (+ (= cell 2) (= cell 3)))
