@@ -179,42 +179,52 @@
 
       (= (first form) 'foreach)
       (let [[_ [x xs] body] form
-            xs-sym (gensym (str *cur-fun* "-xs"))]
+            xs-sym (gensym (str *cur-fun* "-xs"))
+            body-tag (gensym (format "%s-for-body" *cur-fun*))
+            cond-tag (gensym (format "%s-for-cond" *cur-fun*))
+            setup-tag (gensym (format "%s-for-setup" *cur-fun*))
+            start-tag (gensym (format "%s-for-start" *cur-fun*))
+            done-tag (gensym (format "%s-for-done" *cur-fun*))
+            loop-tag (gensym (format "%s-for-loop" *cur-fun*))]
         (binding [*scope* (cons [x xs-sym] *scope*)]
-          (let [body-tag (gensym (format "%s-for-body" *cur-fun*))
-                cond-tag (gensym (format "%s-for-cond" *cur-fun*))
-                start-tag (gensym (format "%s-for-start" *cur-fun*))
-                done-tag (gensym (format "%s-for-done" *cur-fun*))
-                loop-tag (gensym (format "%s-for-loop" *cur-fun*))]
-            (vec
-             (concat
-              [[:ldc 0]
-               [:tsel (str "@" start-tag) (str "@" start-tag)]]
+          (vec
+           (concat
+            [[:ldc 0]
+             [:tsel (str "@" setup-tag) (str "@" setup-tag)]]
 
-              (tag-with body-tag [(load-local xs-sym)])
-              [[:car]
-               (store-local x)
-               (load-local xs-sym)
-               [:cdr]
-               (store-local xs-sym)]
-              (compile-form fns body)
+            (tag-with body-tag [(load-local xs-sym)])
+            [[:car]
+             (store-local x)
+             (load-local xs-sym)
+             [:cdr]
+             (store-local xs-sym)]
+            (compile-form fns body)
 
-              (tag-with cond-tag [(load-local xs-sym)])
-              [[:atom]
-               [:tsel (str "@" done-tag) (str "@" loop-tag)]]
-              (tag-with loop-tag [[:ldc 0]])
-              [[:sel (str "@" body-tag) (str "@" body-tag)]
-               [:cons]
-               [:join]]
+            (tag-with cond-tag [(load-local xs-sym)])
+            [[:atom]
+             [:tsel (str "@" done-tag) (str "@" loop-tag)]]
 
-              (tag-with done-tag [[:ldc 0] [:join]])
+            (tag-with loop-tag [[:ldc 0]])
+            [[:sel (str "@" body-tag) (str "@" body-tag)]
+             [:cons]
+             [:join]]
 
-              (tag-with start-tag (compile-form fns xs))
-              [(store-local xs-sym)
-               [:ldc 0]
-               [:sel (str "@" cond-tag) (str "@" cond-tag)]])))))
+            (tag-with done-tag [[:ldc 0] [:join]])
 
-      ;; List declaration
+            (tag-with start-tag (compile-form fns xs))
+            [(store-local xs-sym)
+             [:ldc 0]
+             [:sel (str "@" cond-tag) (str "@" cond-tag)]
+             [:rtn]]
+
+            (tag-with setup-tag
+                      [[:dum 2]
+                       [:ldc 0]
+                       [:ldc 0]])
+            [[:ldf (str "@" start-tag)]
+             [:rap 2]]))))
+
+      ; list declaration
       (= (first form) 'quote)
       (concat (mapcat #(compile-form fns %) (second form))
               (repeat (dec (count form)) [:cons]))
@@ -241,15 +251,15 @@
 
       ;; function call
       :else
-      (let [[fn-name & args] form
+      (let [[fn-form & args] form
             evaled-args (map #(compile-form fns %) args)]
-        (if-let [builtin (builtins fn-name)]
+        (if-let [builtin (builtins fn-form)]
           (apply builtin evaled-args)
           (concat
             ;; Push the args onto the stack
             (apply concat evaled-args)
-            [(load-symbol fn-name)
-             [:ap (count args)]]))))))
+            (compile-form fns fn-form)
+            [[:ap (count args)]]))))))
 
 (defn resolve-sym
   [name col]
@@ -285,7 +295,7 @@
   {:post [(string? %)]}
   (if (string? line)
     line
-    (let [[op & args] #spy/p line]
+    (let [[op & args] line]
       (string/join " " (cons (string/upper-case (name op)) args)))))
 
 (defn generate-main
