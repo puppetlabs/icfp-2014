@@ -78,7 +78,7 @@
    (load-fn 1 fns name))
   ([frame fns name]
    (if-let [func (first (filter #(= (:name %) name) fns))]
-     [:ld frame (.indexOf fns func) (format "; load fn %s" name)])))
+     [:ld frame (format "^%s" name) (format "; load fn %s" name)])))
 
 (defn load-symbol
   [fns vars name]
@@ -125,7 +125,7 @@
     (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))))
 
 (defn resolve-references
-  [lines]
+  [{:keys [lines fns]}]
   {:pre [(sequential? lines)
          (every? string? lines)]
    :post [(sequential? %)
@@ -137,9 +137,13 @@
                     (map-indexed label-address)
                     (remove nil?)
                     (into {}))
-        resolve-label #(get labels (last %) (last %))]
+        resolve-label #(get labels (last %) (last %))
+        functions (map #(str (:name %)) (rest fns))
+        resolve-call #(str (.indexOf functions (last %)))]
     (for [line lines]
-      (clojure.string/replace line #"@(\S+)" resolve-label))))
+      (let [labels_resolved (clojure.string/replace line #"@(\S+)" resolve-label)
+            fns_resolved (clojure.string/replace labels_resolved #"\^(\S+)" resolve-call)]
+        fns_resolved))))
 
 (defn code->str
   [line]
@@ -179,10 +183,11 @@
   [fns]
   {:pre [(sequential? fns)
          (every? map? fns)]
-   :post [(every? string? %)]}
+   :post [(every? string? (:lines %))]}
   (let [fn-addrs (into {} (map (juxt :name :address) fns))]
-    (->> (mapcat :code fns)
-         (map code->str))))
+    {:lines (->> (mapcat :code fns)
+                 (map code->str))
+     :fns fns}))
 
 (defn import-asm
   [fn-name file]

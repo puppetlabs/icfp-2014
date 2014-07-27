@@ -7,7 +7,7 @@ CDR ; then #nth-recur
 LD 0 1 ; dec n
 LDC 1
 SUB
-LDF @nth
+LD 1 ^nth
 TAP 2
 CAR ; else #nth-base
 RTN
