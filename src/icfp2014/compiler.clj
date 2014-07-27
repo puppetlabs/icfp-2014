@@ -158,6 +158,47 @@
                 (tag-with pred-label pred-codes)
                 [[:sel (str "@" then-label) (str "@" else-label)]]))
 
+      (= (first form) 'foreach)
+      (let [[_ [x xs] body] form]
+        (if (neg? (.indexOf @locals x))
+          (swap! locals conj x))
+        (let [xs-sym (gensym (:name (last fns)))
+              loop-tag (gensym (format "%s-for-loop" (:name (last fns))))
+              body-tag (gensym (format "%s-for-body" (:name (last fns))))
+              cond-tag (gensym (format "%s-for-cond" (:name (last fns))))
+              start-tag (gensym (format "%s-for-start" (:name (last fns))))
+              done-tag (gensym (format "%s-for-done" (:name (last fns))))]
+          (swap! locals conj xs-sym)
+          (vec
+            (concat
+              [[:ldc 0]
+               [:tsel (str "@" start-tag) (str "@" start-tag)]]
+
+              (tag-with body-tag [(load-local xs-sym)])
+              [[:car]
+               [:st 0 (.indexOf @locals x) (format "; store %s" x)]
+               (load-local xs-sym)
+               [:cdr]
+               [:st 0 (.indexOf @locals xs-sym) (format "; store %s" xs-sym)]]
+
+              (compile-form vars fns body)
+
+              (tag-with cond-tag [(load-local xs-sym)])
+              [[:atom]
+               [:tsel (str "@" done-tag) (str "@" loop-tag)]]
+
+              (tag-with loop-tag [[:ldc 0]])
+              [[:sel (str "@" body-tag) (str "@" body-tag)]
+               [:cons]
+               [:join]]
+
+              (tag-with done-tag [[:ldc 0] [:join]])
+
+              (tag-with start-tag (compile-form vars fns xs))
+              [[:st 0 (.indexOf @locals xs-sym) (format "; store %s" xs-sym)]
+               [:ldc 0]
+               [:sel (str "@" cond-tag) (str "@" cond-tag)]]))))
+
       ;; list declaration
       (= (first form) 'quote)
       (concat (mapcat #(compile-form vars fns %) (second form))

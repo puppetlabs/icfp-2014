@@ -60,13 +60,31 @@
     (= dir left)
     (make-coord (dec (x coord)) (y coord))))
 
+(filter [pred coll]
+  (if (empty? coll)
+    coll
+    (if (pred (car coll))
+      (cons (car coll) (filter pred (cdr coll)))
+      (filter pred (cdr coll)))))
+
+(map [func coll]
+  (if (empty? coll)
+    coll
+    (cons (func (car coll)) (map func (cdr coll)))))
+
 (find-pill [world-map coord]
-  (cond
-    (pill? (look-at world-map (to-the up coord))) up
-    (pill? (look-at world-map (to-the right coord))) right
-    (pill? (look-at world-map (to-the down coord))) down
-    (pill? (look-at world-map (to-the left coord))) left
-    true -1))
+  (def points [(to-the up coord)
+               (to-the right coord)
+               (to-the down coord)
+               (to-the left coord)]
+
+  (foreach [point points]
+           (look-at world-map point)))
+  (def pill-locs (filter pill? point-contents))
+
+  (if (empty? pill-locs)
+    left
+    (car pill-locs)))
 
 (x [coord]
   (col coord))
