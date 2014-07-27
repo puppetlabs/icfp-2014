@@ -72,6 +72,12 @@
     coll
     (cons (func (car coll)) (map func (cdr coll)))))
 
+(get-in [indexes lst]
+  (def current (nth lst (car indexes)))
+  (if (empty? (cdr indexes))
+    current
+    (get-in (cdr indexes) current)))
+
 (find-pill [world-map coord]
   (def points [(to-the up coord)
                (to-the right coord)

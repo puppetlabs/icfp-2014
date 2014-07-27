@@ -125,6 +125,14 @@
       (symbol? form)
       [(load-symbol vars form)]
 
+      (map? form)
+      (if (empty? form)
+        [[:ldc 0]]
+        (concat (apply concat (for [[k v] form]
+                                (concat (compile-form vars fns k) (compile-form vars fns v) [[:cons]])))
+                [[:ldc 0]]
+                (repeat (count form) [:cons])))
+
       (vector? form)
       (if (empty? form)
         [[:ldc 0]]
