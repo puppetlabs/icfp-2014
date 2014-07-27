@@ -63,11 +63,6 @@
     (pill? (look-at world-map (to-the left coord))) left
     true -1))
 
-(goto-pill [dir default-dir]
-  (if (neg? dir)
-    default-dir
-    dir))
-
 (x [coord]
   (col coord))
 
@@ -87,4 +82,8 @@
   (nth (nth world-map (row coord)) (col coord)))
 
 (step [state world]
-  '(state (goto-pill (find-pill (world-map world) (whereami world)) up)))
+  (def pill-location (find-pill (world-map world) (whereami world)))
+  (def dir (if (neg? pill-location)
+             up
+             pill-location))
+  '(state dir))
