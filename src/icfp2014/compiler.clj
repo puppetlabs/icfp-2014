@@ -79,6 +79,16 @@
 
    })
 
+(defn fail-on-qualified-symbols
+  [code]
+  (let [fail-fn (fn [form]
+                  (when (and (symbol? form)
+                             (re-find #"/" (str form)))
+                    (throw (IllegalArgumentException.
+                             (format "Found qualified symbol %s" form)))))]
+    (walk/postwalk fail-fn code)
+    true))
+
 (defn tag-with
   [label [stmt & stmts]]
   {:pre [(vector? stmt)
@@ -155,9 +165,6 @@
                 [[:join]]
                 (tag-with pred-label pred-codes)
                 [[:sel (str "@" then-label) (str "@" else-label)]]))
-
-      (= (first form) 'cond)
-      (compile-form vars fns (walk/macroexpand-all form))
 
       ;; list declaration
       (= (first form) 'quote)
@@ -250,7 +257,8 @@
 
 (defn compile-function
   [[name args & body :as code] fns]
-  {:pre [(list? code)]
+  {:pre [(list? code)
+         (fail-on-qualified-symbols code)]
    :post [(vector? (:code %))
           (every? vector? (:code %))]}
   (let [fns (conj fns {:name name})
@@ -272,7 +280,7 @@
       (if form
         (let [func (if (= (first form) 'asm)
                      (import-asm (second form) (last form))
-                     (compile-function form fns))]
+                     (compile-function (walk/macroexpand-all form) fns))]
           (recur (read prog false nil) (conj fns func)))
         (-> fns
             (generate-main)

@@ -45,6 +45,9 @@
   (nth (nth (world-map world) (row coord)) (col coord)))
 
 (step [state world]
-  '(state (if (pill? (look-at world (to-the right (whereami world))))
+  '(state (if (->> (whereami world)
+                   (to-the right)
+                   (look-at world)
+                   (pill?))
             right
             left)))
