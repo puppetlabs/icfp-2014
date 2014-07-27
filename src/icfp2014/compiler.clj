@@ -139,7 +139,9 @@
             fn-name (:name (last fns))
             pred-codes (compile-form vars fns pred)
             then-codes (compile-form vars fns then)
-            else-codes (compile-form vars fns else)
+            else-codes (if else-codes
+                         (compile-form vars fns else)
+                         (throw (IllegalArgumentException. (format "No else clause specified for %s" form))))
             pred-label (gensym (str fn-name "-pred"))
             then-label (gensym (str fn-name "-then"))
             else-label (gensym (str fn-name "-else"))]
