@@ -70,7 +70,7 @@
                      (filter (complement comment?)))
         var-lst (vec (mapcat vars source))]
     (if (> (count var-lst) 255)
-      (throw (IllegalArgumentException. "Too many variables!")))
+      (throw (IllegalArgumentException. "The number of variables is too damn high!")))
     (mapv (partial replace-vars var-lst) source)))
 
 (defn check-length
@@ -82,12 +82,56 @@
     (throw (IllegalArgumentException. (format "This program is too damn long! %d lines!" (count lines))))
     lines))
 
+(defn macrolize-mathop
+  [op args]
+  (let [[dest,x,y] args]
+    [(format "MOV $TMP,%s" x)
+     (format "%s $TMP,%s" op y)
+     (format "MOV %s,$TMP" dest)]))
+
+(defn macrolize
+  [line]
+  (let [parts  (s/split line #"\s")
+        op     (first parts)
+        args   (s/split (second parts) #",")
+        extra  (str " " (s/join " " (drop 2 parts)))
+        instrs (case op
+
+                 "SUB->"
+                 (macrolize-mathop "SUB" args)
+
+                 "ADD->"
+                 (macrolize-mathop "ADD" args)
+
+                 "MUL->"
+                 (macrolize-mathop "MUL" args)
+
+                 "DIV->"
+                 (macrolize-mathop "DIV" args)
+
+                 "AND->"
+                 (macrolize-mathop "AND" args)
+
+                 "OR->"
+                 (macrolize-mathop "OR" args)
+
+                 "XOR->"
+                 (macrolize-mathop "XOR" args)
+
+                 "JMP"
+                 (let [[dest] args]
+                   [(format "JEQ %s,0,0" dest)]))
+
+        instrs (update-in instrs [0] str extra)]
+         (s/join "\n" instrs)))
+
 (defn tag-file*
   [fin-path]
   (->> fin-path
        io/reader
        line-seq
        tag-lines
+       (map macrolize)
        var-lines
        check-length
        (s/join "\n")))
@@ -100,10 +144,5 @@
 
 
 ;; TODO:
-;;
-;; * "macro" facilities
-;; ** unconditional jump
-;; ** sub-and-store: A = B - C
-;; ** probably ^^ for add as well
 ;;
 ;; * "prelude/coda/appendix" of stdlib "funcs"
