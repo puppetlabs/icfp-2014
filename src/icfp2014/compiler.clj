@@ -15,23 +15,25 @@
    ;; Primitive math
 
    'inc (fn [x]
-          [x
-           [:ldc 1 "; inc"]
-           [:add "; inc"]])
+          (concat
+            x
+            [[:ldc 1 "; inc"]
+             [:add "; inc"]]))
    'dec (fn [x]
-          [x
-           [:ldc 1 "; dec"]
-           [:sub "; dec"]])
+          (concat
+            x
+            [[:ldc 1 "; dec"]
+             [:sub "; dec"]]))
 
    '+   (fn
           ([] [[:ldc 0 "; +"]])
           ([& nums]
              (into [] (concat nums (repeat (dec (count nums)) [:add "; +"])))))
    '-   (fn
-          ([x] [[:ldc 0 "; -"] x [:sub "; -"]])
+          ([x] (concat [[:ldc 0 "; -"]] x [[:sub "; -"]]))
           ([x y & nums]
              (into [] (concat
-                       [x y [:sub "; -"]]
+                       x y [[:sub "; -"]]
                        (apply concat (for [num nums]
                                        [num [:sub "; -"]]))))))
    '*   (fn
@@ -39,28 +41,30 @@
           ([& nums]
              (into [] (concat nums (repeat (dec (count nums)) [:mul "; *"])))))
    '/   (fn
-          ([x] [[:ldc 1 "; /"] x [:div "; -"]])
-          ([x y] [x y [:div "; /"]]))
+          ([x] (concat [[:ldc 1 "; /"]] x [[:div "; -"]]))
+          ([x y] (concat x y [[:div "; /"]])))
 
    ;; Comparison ops
 
-   '=   (fn [x y] [x y [:ceq "; ="]])
-   '>   (fn [x y] [x y [:cgt "; >"]])
-   '>=  (fn [x y] [x y [:cgte "; >="]])
+   '=   (fn [x y] (concat x y [[:ceq "; ="]]))
+   '>   (fn [x y] (concat x y [[:cgt "; >"]]))
+   '>=  (fn [x y] (concat x y [[:cgte "; >="]]))
    '<   (fn [x y]
           ;; if x isn't >= y, then x < y
-          [x
-           y
-           [:cgte "; <"]
-           [:ldc 0 "; <"]
-           [:ceq "; <"]])
+          (concat
+            x
+            y
+            [[:cgte "; <"]
+             [:ldc 0 "; <"]
+             [:ceq "; <"]]))
    '<=  (fn [x y]
           ;; if x isn't > y, then x <= y
-          [x
-           y
-           [:cgt "; <="]
-           [:ldc 0 "; <="]
-           [:ceq "; <="]])
+          (concat
+            x
+            y
+            [[:cgt "; <="]
+             [:ldc 0 "; <="]
+             [:ceq "; <="]]))
 
    ;; cons ops
    'car (fn [cons]
@@ -74,6 +78,16 @@
 
    })
 
+(defn tag-with
+  [label [stmt & stmts]]
+  {:pre [(vector? stmt)
+         (not (some vector? stmt))
+         (every? vector? stmts)]
+   :post [(vector? %)
+          (every? vector? %)]}
+  (let [labeled (conj stmt (format "; #%s" label))]
+    (vec (concat [labeled] stmts))))
+
 (defn load-var
   [vars name]
   (let [index (.indexOf vars name)]
@@ -81,55 +95,79 @@
       [:ld 0 index (format "; load var %s" name)])))
 
 (defn load-fn
-  ([fns name]
-   (load-fn 1 fns name))
-  ([frame fns name]
-   (if-let [func (first (filter #(= (:name %) name) fns))]
-     [:ld frame (format "^%s" name) (format "; load fn %s" name)])))
+  ([name]
+   (load-fn 1 name))
+  ([frame name]
+   [:ld frame (format "^%s" name) (format "; load fn %s" name)]))
 
 (defn load-symbol
   [fns vars name]
-  (if-let [load-stmt (or (load-fn fns name) (load-var vars name))]
+  {:post [(vector? %)
+          (not (some vector? %))]}
+  (if-let [load-stmt (or (load-var vars name) (load-fn name))]
     load-stmt
     (throw (IllegalArgumentException. (format "Could not find symbol %s" name)))))
 
 (defn compile-form
   [vars fns form]
-  {:post [(sequential? %)
+  {:pre [form]
+   :post [(vector? %)
           (every? vector? %)]}
-  (cond
-    (integer? form)
-    [[:ldc form]]
+  (vec
+    (cond
+      (integer? form)
+      [[:ldc form]]
 
-    (contains? macros form)
-    (macros form)
+      (contains? macros form)
+      (macros form)
 
-    (symbol? form)
-    [(load-symbol fns vars form)]
+      (symbol? form)
+      [(load-symbol fns vars form)]
 
-    (vector? form)
-    (if (empty? form)
-      [[:ldc 0]]
-      (concat (mapcat #(compile-form vars fns %) form)
-              [[:ldc 0]]
-              (repeat (count form) [:cons])))
+      (vector? form)
+      (if (empty? form)
+        [[:ldc 0]]
+        (concat (mapcat #(compile-form vars fns %) form)
+                [[:ldc 0]]
+                (repeat (count form) [:cons])))
 
-    (seq? form)
-    (let [[fn-name & args] form]
-      (if (= fn-name 'quote)
-        (concat (mapcat #(compile-form vars fns %) (first args))
-                (repeat (dec (count form)) [:cons]))
-        (let [evaled-args (map #(compile-form vars fns %) args)]
-          (if (builtins fn-name)
-            (apply (builtins fn-name) evaled-args)
-            (concat
-              ;; Push the args onto the stack
-              (apply concat evaled-args)
-              [(load-fn fns fn-name)
-               [:ap (count args)]])))))
+      (not (seq? form))
+      (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))
 
-    :else
-    (throw (IllegalArgumentException. (format "Don't know how to compile %s which is %s" form (type form))))))
+      (= (first form) 'if)
+      (let [[_ pred then else] form
+            fn-name (:name (last fns))
+            pred-codes (compile-form vars fns pred)
+            then-codes (compile-form vars fns then)
+            else-codes (compile-form vars fns else)
+            pred-label (gensym (str fn-name "-pred"))
+            then-label (gensym (str fn-name "-then"))
+            else-label (gensym (str fn-name "-else"))]
+        (concat [[:ldc 0]
+                 [:tsel (str "@" pred-label) (str "@" pred-label)]]
+                (tag-with then-label then-codes)
+                [[:join]]
+                (tag-with else-label else-codes)
+                [[:join]]
+                (tag-with pred-label pred-codes)
+                [[:sel (str "@" then-label) (str "@" else-label)]]))
+
+      ;; list declaration
+      (= (first form) 'quote)
+      (concat (mapcat #(compile-form vars fns %) (second form))
+              (repeat (dec (count form)) [:cons]))
+
+      ;; function call
+      :else
+      (let [[fn-name & args] form
+            evaled-args (map #(compile-form vars fns %) args)]
+        (if-let [builtin (builtins fn-name)]
+          (apply builtin evaled-args)
+          (concat
+            ;; Push the args onto the stack
+            (apply concat evaled-args)
+            [(load-fn fn-name)
+             [:ap (count args)]]))))))
 
 (defn resolve-references
   [{:keys [lines fns]}]
@@ -164,7 +202,7 @@
   [fns]
   ;; This depends on the initial state we want
   (let [code [[:ldc 0 "; #main"]
-              (load-fn 0 fns 'step)
+              (load-fn 0 'step)
               [:cons]
               [:rtn]]
         main {:name 'main
@@ -205,14 +243,16 @@
 
 (defn compile-function
   [[name args & body :as code] fns]
-  {:pre [(list? code)]}
+  {:pre [(list? code)]
+   :post [(vector? (:code %))
+          (every? vector? (:code %))]}
   (let [fns (conj fns {:name name})
-        [stmt & stmts] (mapcat #(compile-form args fns %) body)
-        code (concat [(conj stmt (format "; #%s" name))]
-                     stmts
-                     [[:rtn]])]
+        code (->> body
+                  (mapcat #(compile-form args fns %))
+                  (tag-with name))
+        code (concat code [[:rtn]])]
     {:name name
-     :code code
+     :code (vec code)
      :length (count code)}))
 
 (defn compile-ai
