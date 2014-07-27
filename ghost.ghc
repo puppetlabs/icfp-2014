@@ -1,0 +1,69 @@
+;; INT 0 ; reg A -> ghost's new direction
+;; INT 1 ; lambda-man[x,y] -> [A,B]
+;; INT 3, INT 5 ; this-ghost[x,y] -> [A,B]
+
+JEQ @start,0,0                  ;unconditional jump to start
+
+;;; DEFINE "FUNCTIONS"
+MOV A,0                         ;#move-up
+INT 0
+HLT
+
+MOV A,1                         ;#move-right
+INT 0
+HLT
+
+MOV A,2                         ;#move-down
+INT 0
+HLT
+
+MOV A,3                         ;#move-left
+INT 0
+HLT
+
+
+;;; START HERE
+INT 1                           ;[A,B] = [lambda-x,lamda-y] #start
+MOV C,A
+MOV D,B
+INT 3                           ;get this ghost's index
+INT 5                           ;[A,B] = [ghost-x,ghost-y]
+
+;;; Lambda man's location is in [C,D]
+;;; Our location is in [A,B]
+;;; Store the X and Y distance in [C,D] (overwriting lambda-man loc)
+        
+JGT @if-a-bigger,A,C            ; if C>=A
+SUB C,A                         ; then C = C - A
+JEQ @store-y-dist,0,0           ; ...and unconditionally jump to store-y-dist
+SUB A,C                         ; else #if-a-bigger then A = C - A
+MOV C,A                         ; ...and C = A endif
+
+JGT @if-b-bigger,B,D            ; If D>=B #store-y-dist
+SUB D,B                         ; B = D-B
+JEQ @choose-move,0,0
+SUB B,D                         ; else B = D - B #if-b-bigger
+MOV D,B                         ; D now has the Y dist
+JEQ @choose-move,0,0            ; skip to choose-move
+
+;;; MORE FUNCTIONS
+INT 1                           ;[A,B] = [lambda-x,lamda-y] #move-x
+MOV C,A
+MOV D,B                         ;[C,D] = [lambda-x,lambda-y]
+INT 3
+INT 5                           ;[A,B] = [ghost-x,ghost-y]
+JGT @move-left,A,C              ;if ghost-x > lambda-x, move left
+JEQ @move-right,0,0             ;else move right
+
+INT 1                           ;[A,B] = [lambda-x,lamda-y] #move-y
+MOV A,C
+MOV B,D                         ;[C,D] = [lambda-x,lambda-y]
+INT 3
+INT 5                           ;[A,B] = [ghost-x,ghost-y]
+JGT @move-up,B,D                ;if ghost-y > lambda-y, move up
+JEQ @move-down,0,0              ;else move down
+
+
+;;; CHOOSE YOUR MOVE
+JGT @move-x,C,D                 ;if x-dist > y-dist then move-x #choose-move
+JEQ @move-y,0,0                 ;else move-y
