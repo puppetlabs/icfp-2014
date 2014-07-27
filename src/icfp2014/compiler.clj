@@ -4,7 +4,9 @@
             [clojure.walk :as walk]
             [spyscope.core :as spy]))
 
-(def ^:dynamic locals (atom []))
+(def globals (atom []))
+(def ^:dynamic *scope* [])
+(def ^:dynamic *cur-fun* "")
 
 (def macros
   {'up    [[:ldc 0 "; up"]]
@@ -85,32 +87,33 @@
 
 (defn load-local
   [name]
-  (let [index (.indexOf @locals name)]
+  (loop [scope-stack  *scope*
+         depth 0]
+    (let [cur-scope (first scope-stack)
+          parents (next scope-stack)
+          index (.indexOf cur-scope name)]
     (if-not (neg? index)
-      [:ld 0 index (format "; load var %s" name)])))
+      [:ld depth index (format "; load var %s" name)]
+      (if parents
+        (recur parents (inc depth)))))))
 
-(defn load-var
-  [vars name]
-  (let [index (.indexOf vars name)]
-    (if-not (neg? index)
-      [:ld 1 index (format "; load var %s" name)])))
-
-(defn load-fn
-  ([name]
-   (load-fn 2 name))
-  ([frame name]
-   [:ld frame (format "^%s" name) (format "; load fn %s" name)]))
+(defn load-global
+  [name]
+  [:ld (count *scope*) (str "^" name) (format "; load var %s" name)])
 
 (defn load-symbol
-  [vars name]
+  [name]
   {:post [(vector? %)
           (not (some vector? %))]}
-  (if-let [load-stmt (or (load-local name) (load-var vars name) (load-fn name))]
+  (if-let [load-stmt (or (load-local name) (load-global name))]
     load-stmt
     (throw (IllegalArgumentException. (format "Could not find symbol %s" name)))))
 
+;; Need to declare this early because compile-form and compile-function are mutually recursive
+(declare compile-function)
+
 (defn compile-form
-  [vars fns form]
+  [fns form]
   {:pre [(not (nil? form))]
    :post [(vector? %)
           (every? vector? %)]}
@@ -123,20 +126,20 @@
       (macros form)
 
       (symbol? form)
-      [(load-symbol vars form)]
+      [(load-symbol form)]
 
       (map? form)
       (if (empty? form)
         [[:ldc 0]]
         (concat (apply concat (for [[k v] form]
-                                (concat (compile-form vars fns k) (compile-form vars fns v) [[:cons]])))
+                                (concat (compile-form fns k) (compile-form fns v) [[:cons]])))
                 [[:ldc 0]]
                 (repeat (count form) [:cons])))
 
       (vector? form)
       (if (empty? form)
         [[:ldc 0]]
-        (concat (mapcat #(compile-form vars fns %) form)
+        (concat (mapcat #(compile-form fns %) form)
                 [[:ldc 0]]
                 (repeat (count form) [:cons])))
 
@@ -146,13 +149,13 @@
       (= (first form) 'if)
       (let [[_ pred then else] form
             fn-name (:name (last fns))
-            pred-codes (compile-form vars fns pred)
+            pred-codes (compile-form fns pred)
             then-codes (if then
-                         (compile-form vars fns then)
+                         (compile-form fns then)
                          (throw (IllegalArgumentException. (format "Why have an if without a then? %s" form))))
             else-codes (if else
-                         (compile-form vars fns else)
-                         (compile-form vars fns 0))
+                         (compile-form fns else)
+                         (compile-form fns 0))
 
             pred-label (gensym (str fn-name "-pred"))
             then-label (gensym (str fn-name "-then"))
@@ -167,68 +170,84 @@
                 [[:sel (str "@" then-label) (str "@" else-label)]]))
 
       (= (first form) 'foreach)
-      (let [[_ [x xs] body] form]
-        (if (neg? (.indexOf @locals x))
-          (swap! locals conj x))
-        (let [xs-sym (gensym (:name (last fns)))
-              loop-tag (gensym (format "%s-for-loop" (:name (last fns))))
-              body-tag (gensym (format "%s-for-body" (:name (last fns))))
-              cond-tag (gensym (format "%s-for-cond" (:name (last fns))))
-              start-tag (gensym (format "%s-for-start" (:name (last fns))))
-              done-tag (gensym (format "%s-for-done" (:name (last fns))))]
-          (swap! locals conj xs-sym)
-          (vec
-            (concat
+      (let [[_ [x xs] body] form
+            xs-sym (gensym (str *cur-fun* "-xs"))]
+        (binding [*scope* (cons [x xs-sym] *scope*)]
+          (let [body-tag (gensym (format "%s-for-body" *cur-fun*))
+                cond-tag (gensym (format "%s-for-cond" *cur-fun*))
+                start-tag (gensym (format "%s-for-start" *cur-fun*))
+                done-tag (gensym (format "%s-for-done" *cur-fun*))
+                loop-tag (gensym (format "%s-for-loop" *cur-fun*))]
+            (vec
+             (concat
               [[:ldc 0]
                [:tsel (str "@" start-tag) (str "@" start-tag)]]
 
               (tag-with body-tag [(load-local xs-sym)])
               [[:car]
-               [:st 0 (.indexOf @locals x) (format "; store %s" x)]
+               [:st 0 0 (format "; store %s" x)]
                (load-local xs-sym)
                [:cdr]
-               [:st 0 (.indexOf @locals x) (format "; store %s" x)]
-               (compile-form vars fns body)]
+               [:st 0 1 (format "; store %s" xs-sym)]]
+              (compile-form fns body)
 
               (tag-with cond-tag [(load-local xs-sym)])
-              [[:cdr]
-               [:atom]
-               [:sel (str "@" done-tag) (str "@" body-tag)]
+              [[:atom]
+               [:tsel (str "@" done-tag) (str "@" loop-tag)]]
+              (tag-with loop-tag [[:ldc 0]])
+              [[:sel (str "@" body-tag) (str "@" body-tag)]
                [:cons]
                [:join]]
 
               (tag-with done-tag [[:ldc 0] [:join]])
 
-              (tag-with start-tag (compile-form vars fns xs))
-              [[:st 0 (.indexOf @locals xs-sym) (format "; store %s" xs-sym)]
+              (tag-with start-tag (compile-form fns xs))
+              [[:st 0 1 (format "; store %s" xs-sym)]
                [:ldc 0]
-               [:sel (str "@" cond-tag) (str "@" cond-tag)]]))))
+               [:sel (str "@" cond-tag) (str "@" cond-tag)]])))))
 
-      ;; list declaration
+      ;; List declaration
       (= (first form) 'quote)
-      (concat (mapcat #(compile-form vars fns %) (second form))
+      (concat (mapcat #(compile-form fns %) (second form))
               (repeat (dec (count form)) [:cons]))
 
       ;; Variable declaration
       (= (first form) 'def)
       (let [[_ var-name val] form]
-        (if (neg? (.indexOf @locals var-name))
-          (swap! locals conj var-name))
+        (if (neg? (.indexOf @globals var-name))
+          (swap! globals conj (name var-name)))
         (concat
-         (compile-form vars fns val)
-         [[:st 0 (.indexOf @locals var-name) (format "; store %s" var-name)]]))
+         (compile-form fns val)
+         [[:st (count *scope*) (str "^" var-name) (format "; store %s" var-name)]]))
+
+      (= (first form) 'lambda)
+      (let [[_ args & forms] form
+            fn-name (gensym (str (*cur-fun* "-lambda")))
+            fn-end (str fn-name "-end")
+            fn-form (cons fn-name (rest form))]
+        (concat
+         [[:ldc 0]
+          [:tsel (str "@" fn-end) (str "@" fn-end)]]
+         (:code (compile-function  fn-form  fns))
+         (tag-with fn-end [[:ldf (str "@" fn-name)]])))
 
       ;; function call
       :else
       (let [[fn-name & args] form
-            evaled-args (map #(compile-form vars fns %) args)]
+            evaled-args (map #(compile-form fns %) args)]
         (if-let [builtin (builtins fn-name)]
           (apply builtin evaled-args)
           (concat
             ;; Push the args onto the stack
             (apply concat evaled-args)
-            [(load-symbol vars fn-name)
+            [(load-symbol fn-name)
              [:ap (count args)]]))))))
+
+(defn resolve-sym
+  [name col]
+  (let [idx (.indexOf col name)]
+    (if-not (neg? idx)
+      (str idx))))
 
 (defn resolve-references
   [{:keys [lines fns]}]
@@ -247,10 +266,10 @@
                     (into {}))
         resolve-label #(get labels (last %) (last %))
         functions (map #(str (:name %)) (rest fns))
-        resolve-call #(str (.indexOf functions (last %)))]
+        resolve-global #(resolve-sym  (second %)  (concat functions @globals))]
     (for [line lines]
       (let [labels_resolved (clojure.string/replace line #"@(\S+)" resolve-label)
-            fns_resolved (clojure.string/replace labels_resolved #"\^(\S+)" resolve-call)]
+            fns_resolved (clojure.string/replace labels_resolved #"\^(\S+)" resolve-global)]
         fns_resolved))))
 
 (defn code->str
@@ -258,14 +277,14 @@
   {:post [(string? %)]}
   (if (string? line)
     line
-    (let [[op & args] line]
+    (let [[op & args] #spy/p line]
       (string/join " " (cons (string/upper-case (name op)) args)))))
 
 (defn generate-main
   [fns]
   ;; This depends on the initial state we want
   (let [code [[:ldc 0 "; #main"]
-              (load-fn 0 'step)
+              (load-global 'step)
               [:cons]
               [:rtn "; end main"]]
         main {:name 'main
@@ -277,10 +296,14 @@
   [fns]
   (let [loads  (for [func fns]
                  [:ldf (format "@%s ; load %s" (:name func) (:name func))])
-        code (concat [[:dum (count fns) "; #prelude"]]
+        global-loads (for [global @globals]
+                       [:ldc 0 (format "; initialize %s" global)])
+        frame-size (+ (count @globals) (count fns))
+        code (concat [[:dum frame-size "; #prelude"]]
                      loads
+                     global-loads
                      [[:ldf "@main ; load main"]
-                      [:rap (count fns)]
+                      [:rap frame-size]
                       [:rtn "; end prelude"]])
         prelude {:name 'prelude
               :code code
@@ -306,23 +329,16 @@
 
 (defn compile-function
   [[name args & body :as code] fns]
-  {:pre [(list? code)
+  {:pre [(seq? code)
          (fail-on-qualified-symbols code)]
    :post [(vector? (:code %))
           (every? vector? (:code %))]}
-  (binding [locals (atom [])]
-    (let [localname (format "%s_body" name)
-          code (->> body
-                    (mapcat #(compile-form args fns %))
-                    (tag-with localname))
-          code (concat code [[:rtn (str "; end " name)]])
-          num-locals (count @locals)
-          local-scope (concat [[:dum num-locals]]
-                       (vec (repeatedly num-locals #(identity [:ldc 0])))
-                       [[:ldf (format "@%s" localname)]
-                        [:trap num-locals]])
-          local-scope (tag-with name local-scope)
-          code (concat local-scope code)]
+  (binding [*scope* (cons args *scope*)
+            *cur-fun* name]
+    (let [code (->> body
+                    (mapcat #(compile-form fns %))
+                    (tag-with name))
+          code (concat code [[:rtn (str "; end " name)]])]
       {:name name
        :code (vec code)
        :length (count code)})))

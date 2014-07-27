@@ -82,10 +82,10 @@
   (def points [(to-the up coord)
                (to-the right coord)
                (to-the down coord)
-               (to-the left coord)]
+               (to-the left coord)])
 
-  (foreach [point points]
-           (look-at world-map point)))
+  (def point-contents (foreach [point points]
+			       (look-at world-map point)))
   (def pill-locs (filter pill? point-contents))
 
   (if (empty? pill-locs)
