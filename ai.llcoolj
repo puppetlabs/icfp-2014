@@ -3,11 +3,17 @@
 (asm % "mod.gcc")
 (asm nth "nth.gcc")
 
+(row [coord]
+  (cdr coord))
+
+(col [coord]
+  (car coord))
+
 (world-map [world]
   (car world))
 
-(look-at [world pair]
-  (nth (nth (world-map world) (cdr pair)) (car pair)))
+(look-at [world coord]
+  (nth (nth (world-map world) (row coord)) (col coord)))
 
 (step [state world]
   '(state (% (look-at world (nth (nth (nth world 2) 0) 1)) 4)))
