@@ -4,6 +4,8 @@
             [clojure.walk :as walk]
             [spyscope.core :as spy]))
 
+(def ^:dynamic locals (atom []))
+
 (def macros
   {'up    [[:ldc 0 "; up"]]
    'right [[:ldc 1 "; right"]]
@@ -79,15 +81,21 @@
   (let [labeled (conj stmt (format "; #%s" label))]
     (vec (concat [labeled] stmts))))
 
+(defn load-local
+  [name]
+  (let [index (.indexOf @locals name)]
+    (if-not (neg? index)
+      [:ld 0 index (format "; load var %s" name)])))
+
 (defn load-var
   [vars name]
   (let [index (.indexOf vars name)]
     (if-not (neg? index)
-      [:ld 0 index (format "; load var %s" name)])))
+      [:ld 1 index (format "; load var %s" name)])))
 
 (defn load-fn
   ([name]
-   (load-fn 1 name))
+   (load-fn 2 name))
   ([frame name]
    [:ld frame (format "^%s" name) (format "; load fn %s" name)]))
 
@@ -95,7 +103,7 @@
   [fns vars name]
   {:post [(vector? %)
           (not (some vector? %))]}
-  (if-let [load-stmt (or (load-var vars name) (load-fn name))]
+  (if-let [load-stmt (or (load-local name) (load-var vars name) (load-fn name))]
     load-stmt
     (throw (IllegalArgumentException. (format "Could not find symbol %s" name)))))
 
@@ -150,6 +158,15 @@
       (= (first form) 'quote)
       (concat (mapcat #(compile-form vars fns %) (second form))
               (repeat (dec (count form)) [:cons]))
+
+      ;; Variable declaration
+      (= (first form) 'def)
+      (let [[_ var-name val] form]
+        (if (neg? (.indexOf @locals var-name))
+          (swap! locals conj var-name))
+        (concat
+         (compile-form vars fns val)
+         [[:st 0 (.indexOf @locals var-name) (format "; store %s" var-name)]]))
 
       ;; function call
       :else
@@ -243,14 +260,22 @@
          (fail-on-qualified-symbols code)]
    :post [(vector? (:code %))
           (every? vector? (:code %))]}
-  (let [fns (conj fns {:name name})
-        code (->> body
-                  (mapcat #(compile-form args fns %))
-                  (tag-with name))
-        code (concat code [[:rtn]])]
-    {:name name
-     :code (vec code)
-     :length (count code)}))
+  (binding [locals (atom [])]
+    (let [localname (format "%s_body" name)
+          code (->> body
+                    (mapcat #(compile-form args fns %))
+                    (tag-with localname))
+          code (concat code [[:rtn]])
+          num-locals (count @locals)
+          local-scope (concat [[:dum num-locals]]
+                       (vec (repeatedly num-locals #(identity [:ldc 0])))
+                       [[:ldf (format "@%s" localname)]
+                        [:trap num-locals]])
+          local-scope (tag-with name local-scope)
+          code (concat local-scope code)]
+      {:name name
+       :code (vec code)
+       :length (count code)})))
 
 (defn compile-ai
   [file]
