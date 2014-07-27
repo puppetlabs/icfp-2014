@@ -85,6 +85,14 @@
   (let [labeled (conj stmt (format "; #%s" label))]
     (vec (concat [labeled] stmts))))
 
+(defn store-local
+  [name]
+  (let [cur-scope (first *scope*)
+        index (.indexOf cur-scope name)]
+    (if-not (neg? index)
+      [:st 0 index (format "; store var %s" name)]
+      (throw (IllegalArgumentException. (format "Tried to store to unknown scope var: %s" name))))))
+
 (defn load-local
   [name]
   (loop [scope-stack  *scope*
@@ -185,10 +193,10 @@
 
               (tag-with body-tag [(load-local xs-sym)])
               [[:car]
-               [:st 0 0 (format "; store %s" x)]
+               (store-local x)
                (load-local xs-sym)
                [:cdr]
-               [:st 0 1 (format "; store %s" xs-sym)]]
+               (store-local xs-sym)]
               (compile-form fns body)
 
               (tag-with cond-tag [(load-local xs-sym)])
@@ -202,7 +210,7 @@
               (tag-with done-tag [[:ldc 0] [:join]])
 
               (tag-with start-tag (compile-form fns xs))
-              [[:st 0 1 (format "; store %s" xs-sym)]
+              [(store-local xs-sym)
                [:ldc 0]
                [:sel (str "@" cond-tag) (str "@" cond-tag)]])))))
 
