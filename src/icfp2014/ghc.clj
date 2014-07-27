@@ -3,9 +3,10 @@
             [clojure.string :as s]))
 
 (defn comment?
-  "Return true if the line ONLY contains commentary."
+  "Return true if the line contains NO CODE."
   [line]
-  (boolean (re-seq #"^\s*;.*" line)))
+  (boolean (or (s/blank? line)
+               (re-seq #"^\s*;.*" line))))
 
 (defn hashtag
   "Return the name of a hashtag, if any. Otherwise return nil."
@@ -15,7 +16,7 @@
 (defn attag
   "Return the name of an @tag, if any. Otherwise return nil."
   [line]
-  (last (first (re-seq #"@(\S+)" line))))
+  (last (first (re-seq #"@([a-zA-Z\-]+)" line))))
 
 (defn scan-hashtag
   "Returns a vector of [hashtag line-number] if the line contains a hashtag.
