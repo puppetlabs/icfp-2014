@@ -9,6 +9,8 @@
    'right [[:ldc 1 "; right"]]
    'down  [[:ldc 2 "; down"]]
    'left  [[:ldc 3 "; left"]]
+   'true  [[:ldc 1 "; true"]]
+   'false [[:ldc 0 "; false"]]
    })
 
 (def builtins
@@ -44,28 +46,6 @@
    '/   (fn
           ([x] (concat [[:ldc 1 "; /"]] x [[:div "; -"]]))
           ([x y] (concat x y [[:div "; /"]])))
-
-   ;; Comparison ops
-
-   '=   (fn [x y] (concat x y [[:ceq "; ="]]))
-   '>   (fn [x y] (concat x y [[:cgt "; >"]]))
-   '>=  (fn [x y] (concat x y [[:cgte "; >="]]))
-   '<   (fn [x y]
-          ;; if x isn't >= y, then x < y
-          (concat
-            x
-            y
-            [[:cgte "; <"]
-             [:ldc 0 "; <"]
-             [:ceq "; <"]]))
-   '<=  (fn [x y]
-          ;; if x isn't > y, then x <= y
-          (concat
-            x
-            y
-            [[:cgt "; <="]
-             [:ldc 0 "; <="]
-             [:ceq "; <="]]))
 
    ;; cons ops
    'car (fn [cons]
@@ -121,7 +101,7 @@
 
 (defn compile-form
   [vars fns form]
-  {:pre [form]
+  {:pre [(not (nil? form))]
    :post [(vector? %)
           (every? vector? %)]}
   (vec
@@ -190,10 +170,12 @@
    :post [(sequential? %)
           (every? string? %)]}
   (let [label-address (fn [index line]
-                        (if-let [label (last (first (re-seq #"#(\S+)" line)))]
-                          [label (str index)]))
+                        (if-let [labels (map last (re-seq #"#(\S+)" line))]
+                          (for [label labels]
+                            [label (str index)])))
         labels (->> lines
                     (map-indexed label-address)
+                    (apply concat)
                     (remove nil?)
                     (into {}))
         resolve-label #(get labels (last %) (last %))

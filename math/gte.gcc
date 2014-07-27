@@ -1,0 +1,4 @@
+LD 0 0 ; (x >= y) #>= #gte
+LD 0 1
+CGTE
+RTN

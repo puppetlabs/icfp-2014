@@ -1,0 +1,4 @@
+LD 0 0 ; (x > y) #> #gt
+LD 0 1
+CGT
+RTN

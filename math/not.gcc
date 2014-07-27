@@ -1,0 +1,4 @@
+LD 0 0 ; (x != 0) #! #not
+LDC 0
+CEQ
+RTN

@@ -1,7 +1,35 @@
-(asm abs "abs.gcc")
+(asm abs "math/abs.gcc")
+(asm % "math/mod.gcc")
+(asm > "math/gt.gcc")
+(asm >= "math/gte.gcc")
+(asm = "math/eq.gcc")
+(asm not "math/not.gcc")
 (asm distance "distance.gcc")
-(asm % "mod.gcc")
 (asm nth "nth.gcc")
+
+(pos? [x]
+  (> x 0))
+
+(neg? [x]
+  (< x 0))
+
+(zero? [x]
+  (= x 0))
+
+(<= [x y]
+  (>= y x))
+
+(< [x y]
+  (> y x))
+
+(!= [x y]
+  (not (= x y)))
+
+(false? [val]
+  (= val false))
+
+(true? [val]
+  (not (false? val)))
 
 (pill? [cell]
   (= cell 2))
@@ -26,6 +54,19 @@
     (= dir left)
     (make-coord (dec (x coord)) (y coord))))
 
+(find-pill [world-map coord]
+  (cond
+    (pill? (to-the up coord)) up
+    (pill? (to-the right coord)) right
+    (pill? (to-the down coord)) down
+    (pill? (to-the left coord)) left
+    true -1))
+
+(goto-pill [dir default-dir]
+  (if (neg? dir)
+    default-dir
+    dir))
+
 (x [coord]
   (col coord))
 
@@ -45,9 +86,4 @@
   (nth (nth (world-map world) (row coord)) (col coord)))
 
 (step [state world]
-  '(state (if (->> (whereami world)
-                   (to-the right)
-                   (look-at world)
-                   (pill?))
-            right
-            left)))
+  '(state (goto-pill (find-pill (world-map world) (whereami world)) up)))

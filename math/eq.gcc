@@ -1,0 +1,4 @@
+LD 0 0 ; (x == y) #= #eq
+LD 0 1
+CEQ
+RTN
