@@ -311,9 +311,13 @@
                     (apply concat)
                     (remove nil?)
                     (into {}))
-        resolve-label #(get labels (last %) (last %))
+        resolve-label #(if-let [label (get labels (last %) (last %))]
+                         label
+                         (throw (IllegalArgumentException. (format "Couldn't resolve label %s" (last %)))))
         functions (map #(str (:name %)) (rest fns))
-        resolve-global #(resolve-sym  (second %)  (concat functions @globals))]
+        resolve-global #(if-let [global (resolve-sym (second %) (concat functions @globals))]
+                          global
+                          (throw (IllegalArgumentException. (format "Couldn't resolve global %s" (second %)))))]
     (for [line lines]
       (let [labels_resolved (clojure.string/replace line #"@(\S+)" resolve-label)
             fns_resolved (clojure.string/replace labels_resolved #"\^(\S+)" resolve-global)]
