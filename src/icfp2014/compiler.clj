@@ -158,12 +158,12 @@
       (let [[_ pred then else] form
             fn-name (:name (last fns))
             pred-codes (compile-form fns pred)
-            then-codes (if then
-                         (compile-form fns then)
-                         (throw (IllegalArgumentException. (format "Why have an if without a then? %s" form))))
-            else-codes (if else
-                         (compile-form fns else)
-                         (compile-form fns 0))
+            then-codes (if (nil? then)
+                         (throw (IllegalArgumentException. (format "Why have an if without a then? %s" form)))
+                         (compile-form fns then))
+            else-codes (if (nil? else)
+                         (compile-form fns 0)
+                         (compile-form fns else))
 
             pred-label (gensym (str fn-name "-pred"))
             then-label (gensym (str fn-name "-then"))
