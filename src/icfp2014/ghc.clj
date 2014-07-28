@@ -60,15 +60,18 @@
               (-> (s/replace l
                              (str "$" var)
                              (str "[" idx "]"))
-                  (str (format " ; $%s = %d" var idx)))))
+                  (str (format " ; %s=%d" var idx)))))
           line
-          (vars line)))
+          (-> line
+              vars
+              sort
+              reverse)))
 
 (defn var-lines
   [seq-of-lines]
   (let [source  (->> seq-of-lines
                      (filter (complement comment?)))
-        var-lst (vec (mapcat vars source))]
+        var-lst (vec (set (mapcat vars source)))]
     (if (> (count var-lst) 255)
       (throw (IllegalArgumentException. "The number of variables is too damn high!")))
     (mapv (partial replace-vars var-lst) source)))
