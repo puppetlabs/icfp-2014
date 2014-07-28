@@ -26,7 +26,6 @@ MOV C,$ghost-dir
 MOV D,$mode
 MOV E,$chase-counter
 MOV F,$random-counter
-INT 8
 HLT
 
 MOV $proposed-dir,0                                          ;#move-up
