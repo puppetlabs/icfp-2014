@@ -45,6 +45,26 @@
                row))]
     (reduce-with-index collect-row-pills [] map)))
 
+(find-fruit-row*
+  [row x]
+  (if (empty? row)
+    -1
+    (if (= 4 (car row))
+      x
+      (find-fruit-row* (cdr row) (inc x)))))
+
+(find-fruit*
+  [map y]
+  (let [row (nth map y)
+        x (find-fruit-row* row 0)]
+    (if (= -1 x)
+      (find-fruit* map (inc y))
+      '(x y))))
+
+(find-fruit
+  [map]
+  (find-fruit* map 0))
+
 (nearest-power-pill
   [power-pills coord]
   (if (empty? power-pills)
@@ -225,7 +245,7 @@
   (let [open-spaces (->> lman-coord
                          (available-moves [left down right up])
                          (map #(to-the % lman-coord))
-                         (filter #(not (contains? ghost-locs %))))
+                         (filter #(not (contains? (ghost-locs world) %))))
         unique-open-spaces (filter #(not (= last-square %)) open-spaces)]
     (if (empty? unique-open-spaces)
       (car open-spaces)
@@ -281,9 +301,10 @@
                   [0 1 1 1 0]
                   [0 0 0 0 0]]]
   (let [power-pills (find-power-pills (world-map world))
-        goal (nearest-power-pill power-pills (whereami world))]
-    ;; goal, power-pills, panic-mode
-    [goal power-pills '(0 0)])))
+        goal (nearest-power-pill power-pills (whereami world))
+        fruit (find-fruit (world-map world))]
+    ;; goal, power-pills, fruit, panic-mode
+    [goal power-pills fruit '(0 0)])))
 
 (ghost-goal
   [ai-state world]
@@ -303,16 +324,19 @@
   [ai-state world]
   (let [current-goal (nth ai-state 0)
         power-pills (nth ai-state 1)
-        last-square (nth ai-state 2)
-        ghost (ghost-goal ai-state world)]
+        fruit (nth ai-state 2)
+        last-square (nth ai-state 3)
+        ghost (debug (ghost-goal ai-state world))]
     (if (atom? ghost)
-      (let [power-pill (nearest-power-pill power-pills lman-coord)]
-        (if (atom? power-pill)
-          (let [pill (pill-goal ai-state world)]
-            (if (atom? pill)
-              (wander last-square world)
-              pill))
-          power-pill))
+      (if (cdr (cdr (cdr world)))
+        fruit
+        (let [power-pill (nearest-power-pill power-pills lman-coord)]
+          (if (atom? power-pill)
+            (let [pill (pill-goal ai-state world)]
+              (if (atom? pill)
+                (wander last-square world)
+                pill))
+            power-pill)))
       ghost)))
 
 (step
@@ -325,11 +349,11 @@
 
   (let [current-goal (nth ai-state 0)
         power-pills (nth ai-state 1)
-        last-square (nth ai-state 2)
+        fruit (nth ai-state 2)
+        last-square (debug (nth ai-state 3))
         new-power-pills (set-delete power-pills lman-coord)
-        new-goal (goal [current-goal new-power-pills last-square] world) ]
-    (dbug new-goal)
-    (let [new-ai-state [new-goal new-power-pills lman-coord]
+        new-goal (goal [current-goal new-power-pills fruit last-square] world) ]
+    (let [new-ai-state [new-goal new-power-pills fruit lman-coord]
           path (a* lman-coord new-goal)
           next-square (nth path 1)
           dir (which-way-is next-square lman-coord)]
