@@ -22,6 +22,22 @@
     coll
     (cons (func (car coll)) (map func (cdr coll)))))
 
+(reduce
+  [func acc coll]
+  (if (empty? coll)
+    acc
+    (reduce func (func acc (car coll)) (cdr coll))))
+
+(reduce-with-index*
+  [func acc coll idx]
+  (if (empty? coll)
+    acc
+    (reduce-with-index* func (func acc (car coll) idx) (cdr coll) (inc idx))))
+
+(reduce-with-index
+  [func acc coll]
+  (reduce-with-index* func acc coll 0))
+
 (get-in [indexes lst]
   (def current (nth lst (car indexes)))
   (if (empty? (cdr indexes))

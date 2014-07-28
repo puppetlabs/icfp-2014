@@ -2,6 +2,9 @@
   ;; "+ is or" -- branan
   (+ (= cell 2) (= cell 3)))
 
+(power-pill? [cell]
+  (= cell 3))
+
 (wall?
   [cell]
   (= cell 0))

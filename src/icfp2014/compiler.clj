@@ -159,7 +159,7 @@
 
       (= (first form) 'if)
       (let [[_ pred then else] form
-            fn-name (:name (last fns))
+            fn-name *cur-fun*
             pred-codes (compile-form fns pred)
             then-codes (if (nil? then)
                          (throw (IllegalArgumentException. (format "Why have an if without a then? %s" form)))
@@ -338,11 +338,10 @@
   [fns]
   ;; This depends on the initial state we want
   (let [code (tag-with "main"
-                       [(load-global 'testing)
-                        [:ap 0]
-                        [:ldc 0]
-                        [:ldc 0]
-                        [:cons]
+                       [[:ld 1 0]
+                        [:ld 1 1]
+                        (load-global 'init)
+                        [:ap 2]
                         (load-global 'step)
                         [:cons]
                         [:rtn "; end main"]])
