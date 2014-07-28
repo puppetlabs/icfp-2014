@@ -1,43 +1,45 @@
 ;;; DEFINE GLOBALS
 LAMBDA-POS $lambda[x],$lambda[y]
 MY-POS $ghost[x],$ghost[y]
-MY-STAT $ghost-vit,$ghost-dir
+MY-STAT $ghost-status,$ghost-dir
 INT 3                           ; get my index in A
-MOV $me-index,A
+MOV $my-index,A
 
-;;; <DEBUG CODE>
-MOV A,$random
-MOV B,$turn-counter
-MOV C,$me-index
-INT 8
-;;; </DEBUG>
-
-JGT @choose-mode,$turn-counter,0 ;jump to choose-mode if the turn counter > 0
+JMP @choose-mode
 
 ;;; INIT
-MOV $turn-counter,10            ;#init (we usually skip this)
-XOR $random,1
+MOV $base-counter,20            ;#init
+MUL $chase-counter,$my-index
+ADD $chase-counter,$base-counter
 
-DEC $turn-counter                ;#choose-mode (always dec the counter)
-JEQ @chase-mode,$random,0        ;if chase = 1, jump to chase-mode
+MOV $random-counter,$base-counter
+INC $mode
+MOD-> $tmp-mode,$mode,2
+MOV $mode,$tmp-mode
+
+JEQ @chase-mode,$mode,0        ;if chase = 1, jump to chase-mode #choose-mode
 JMP @random-mode                 ;otherwise we're in random-mode
 
 ;;; DEFINE "FUNCTIONS"
-MOV A,$random                                    ;#cleanup
-MOV B,$turn-counter
+MOV B,$proposed-dir                                    ;#cleanup
+MOV C,$ghost-dir
+MOV D,$mode
+MOV E,$chase-counter
+MOV F,$random-counter
+INT 8
 HLT
 
 MOV $proposed-dir,0                                          ;#move-up
-JMP @dontbacktrack
+JMP @panicmode
 
 MOV $proposed-dir,1                                          ;#move-right
-JMP @dontbacktrack
+JMP @panicmode
 
 MOV $proposed-dir,2                                          ;#move-down
-JMP @dontbacktrack
+JMP @panicmode
 
 MOV $proposed-dir,3                                          ;#move-left
-JMP @dontbacktrack
+JMP @panicmode
 
 JGT @move-left,$ghost[x],$lambda[x]             ; #move-x
 JMP @move-right
@@ -45,6 +47,12 @@ JMP @move-right
 JGT @move-up,$ghost[y],$lambda[y]               ; #move-y
 JMP @move-down
 
+JEQ @dontbacktrack,$ghost-status,0          ; #panicmode
+INC $proposed-move
+INC $proposed-move
+MOD-> A,$proposed-move,4
+INT 0
+JMP @cleanup
 
 ADD-> $sum-of-dirs,$ghost-dir,$proposed-dir ; #dontbacktrack
 MOD-> $backtrack,$sum-of-dirs,2
@@ -53,8 +61,9 @@ MOV A,$proposed-dir
 INT 0
 JMP @cleanup
 
-INC $proposed-dir               ; #veto
-MOD-> A,$proposed-dir,4
+MOV $tmp-proposed-dir,$proposed-dir ; #veto
+INC $tmp-proposed-dir
+MOD-> A,$tmp-proposed-dir,4
 INT 0
 JMP @cleanup
 
@@ -64,7 +73,9 @@ JMP @cleanup
 ;;;   $xdist = $lambda[x] - $ghost[x]
 ;;; else
 ;;;   $xdist = $ghost[x] - $lambda[x]
-JGT @if-ghost[x]-bigger,$ghost[x],$lambda[x] ; #chase-mode
+JEQ @init,$chase-counter,0      ; #chase-mode
+DEC $chase-counter
+JGT @if-ghost[x]-bigger,$ghost[x],$lambda[x]
 SUB-> $xdist,$lambda[x],$ghost[x]
 JMP @store-y-dist
 SUB-> $xdist,$ghost[x],$lambda[x]                         ; else #if-ghost[x]-bigger then A = C - A
@@ -86,8 +97,10 @@ JGT @move-x,$xdist,$ydist                       ;if x-dist > y-dist then move-x 
 JMP @move-y                                     ;else move-y
 
         ;; RANDOM MODE
-MUL-> $prandom,$ghost[x],$lambda[y]              ; #random-mode
+JEQ @init,$random-counter,0     ; #random-mode
+DEC $random-counter
+MUL-> $prandom,$ghost[x],$lambda[y]
 MUL-> $prandom,$ghost-dir,$lambda[x]
 MOD-> $new-dir,$prandom,4
 MOV $proposed-dir,$new-dir
-JMP @dontbacktrack
+JMP @panicmode
