@@ -63,4 +63,4 @@
   (car world))
 
 (look-at [coord]
-  (nth (nth map (row coord)) (col coord)))
+  (nth (nth game-map (row coord)) (col coord)))

@@ -38,8 +38,10 @@
   [func acc coll]
   (reduce-with-index* func acc coll 0))
 
-(get-in [indexes lst]
-  (def current (nth lst (car indexes)))
-  (if (empty? (cdr indexes))
-    current
-    (get-in (cdr indexes) current)))
+(get-in
+  [indexes lst]
+  (let [current (nth lst (car indexes))
+        others (cdr indexes)]
+    (if (empty? others)
+      current
+      (get-in others current))))
