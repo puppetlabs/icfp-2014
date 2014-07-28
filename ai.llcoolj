@@ -15,18 +15,20 @@
   (->> dirs
        (filter #(movable? (look-to-the % lman-coord 1)))))
 
+(next-move
+  [last-square world]
+  (let [pills (find-pills [up right down left])
+        open-spaces (available-moves [left down right up])
+        unique-open-spaces (filter #(not (coord= (to-the % lman-coord) last-square)) open-spaces)]
+    (if (empty? pills)
+      (if (empty? unique-open-spaces)
+        (car open-spaces)
+        (car unique-open-spaces))
+      (car pills))))
+
 (step
   [last-square world]
   (def map (world-map world))
   (def lman-coord (whereami world))
-  (def pills (find-pills [up right down left]))
-  (def open-spaces (available-moves [left down right up]))
-  (def unique-open-spaces (filter #(not (coord= (to-the % lman-coord) last-square)) open-spaces))
 
-  (def next-move (if (empty? pills)
-                   (if (empty? unique-open-spaces)
-                     (car open-spaces)
-                     (car unique-open-spaces))
-                   (car pills)))
-
-  '(lman-coord next-move))
+  '(lman-coord (next-move last-square world)))
