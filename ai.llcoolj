@@ -104,9 +104,29 @@
       (cdr set)
       (cons (car set) (set-delete (cdr set) item)))))
 
+(prioritized-moves
+  [start goal]
+  (let [start-x (x start)
+        start-y (y start)
+        goal-x (x goal)
+        goal-y (y goal)]
+
+    (cond
+      (* (<= start-x goal-x) (<= start-y goal-y))
+      [right down left up]
+
+      (* (<= start-x goal-x) (> start-y goal-y))
+      [right up left down]
+
+      (* (> start-x goal-x) (<= start-y goal-y))
+      [left down right up]
+
+      (* (> start-x goal-x) (> start-y goal-y))
+      [left up right down])))
+
 (neighbor-nodes
-  [coord]
-  (foreach [move (available-moves [left down right up] coord)]
+  [coord goal]
+  (foreach [move (available-moves (prioritized-moves coord goal) coord)]
             (to-the move coord)))
 
 (min*
@@ -170,7 +190,7 @@
     (let [current (min open #(map-get f-score % 0))]
       (if (= current goal)
         (reconstruct-path came-from goal)
-        (let [neighbors (->> (neighbor-nodes current)
+        (let [neighbors (->> (neighbor-nodes current goal)
                              (filter #(not (contains? closed %))))
               current-g-score (map-get g-score current 0)]
           (let [results (update-neighbors current goal neighbors f-score g-score current-g-score (set-delete open current) (set-insert closed current) came-from)
@@ -194,9 +214,18 @@
         [(to-the right start)]
         plan))))
 
+(ghost-locs
+  [world]
+  (->> (nth world 2)
+       (filter #(= (car %) 0))
+       (map #(nth % 1))) )
+
 (wander
   [last-square world]
-  (let [open-spaces (map #(to-the % lman-coord) (available-moves [left down right up] lman-coord))
+  (let [open-spaces (->> lman-coord
+                         (available-moves [left down right up])
+                         (map #(to-the % lman-coord))
+                         (filter #(not (contains? ghost-locs %))))
         unique-open-spaces (filter #(not (= last-square %)) open-spaces)]
     (if (empty? unique-open-spaces)
       (car open-spaces)
@@ -223,18 +252,20 @@
 
 (tile-cost
   [curr neighbor]
-  (let [tile (look-at neighbor)]
-       ;; pills, power pills, and fruit are cheaper
-       ;; than empty tiles
-    (if (+ (= tile 2) (= tile 3) (= tile 4))
-      1
-      (let [ghost-locs (->> (nth game-world 2)
-                            (filter #(= (car %) 0))
-                            (map #(nth % 1)))]
-        ;; ghosts are expensive if we're not in ghost-hunting mode
-        (if (contains? ghost-locs neighbor)
-          5
-          2)))))
+  (let [tile (look-at neighbor)
+        ghost-locs (->> (nth game-world 2)
+                        (filter #(= (car %) 0))
+                        (map #(nth % 1)))]
+    ;; ghosts are expensive if we're not in ghost-hunting mode
+    (if (contains? ghost-locs neighbor)
+      (let [ghost-distance (distance lman-coord neighbor)
+            ghost-cost (if (> ghost-distance 5) 0 (- 5 ghost-distance))]
+        (* ghost-cost ghost-cost))
+      ;; pills, power pills, and fruit are cheaper
+      ;; than empty tiles
+      (if (+ (= tile 2) (= tile 3) (= tile 4))
+        1
+        2))))
 
 (init
   [world ghost-ai]
