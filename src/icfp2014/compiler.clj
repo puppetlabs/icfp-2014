@@ -378,4 +378,5 @@
             (generate-prelude)
             (emit-code)
             (resolve-references)
-            (#(string/join "\n" %)))))))
+            (vec)
+            (#(string/join "\n" (conj % nil))))))))
