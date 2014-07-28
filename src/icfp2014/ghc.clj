@@ -102,7 +102,8 @@
               "GHOST-POS"
               "SQUARE-AT"
               "GHOST-STAT"
-              "MY-STAT"})
+              "MY-STAT"
+              "MOD->"})
 
 (defn macrolize
   [line]
@@ -176,7 +177,17 @@
                         "INT 6"
                         (format "MOV %s,A" dest-vit)
                         (format "MOV %s,B" dest-dir)])
-
+                     
+                     "MOD->"
+                     (let [[dest x y] args]
+                       [(format "MOV $TMP,%s" x)
+                        (format "DIV $TMP,%s" y)
+                        (format "MOV %s,%s" dest y)
+                        (format "MUL %s,$TMP" dest)
+                        (format "MOV $TMP,%s" dest)
+                        (format "MOV %s,%s" dest x)
+                        (format "SUB %s,$TMP" dest)])
+                     
                      "JMP"
                      (let [[dest] args]
                        [(format "JEQ %s,0,0" dest)]))
