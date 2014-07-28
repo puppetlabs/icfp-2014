@@ -249,6 +249,35 @@
          (:code (compile-function  fn-form  fns))
          (tag-with fn-end [[:ldf (str "@" fn-name)]])))
 
+      (= (first form) 'let*)
+      (let [[_ args & forms] form
+            let-start (gensym (str *cur-fun* "-let"))
+            let-end  (str let-start "-end")
+            binding-pairs (partition 2 args)
+            binding-names (map first binding-pairs)
+            binding-size (count binding-names)]
+        (binding
+            [ *scope* (cons binding-names *scope*)]
+            (vec
+             (concat
+              [[:ldc 0]
+               [:tsel (str "@" let-end) (str "@" let-end)]]
+              (tag-with let-start
+                        (apply concat
+                               (map
+                                #(concat (compile-form fns (second %))
+                                         [(store-local (first %))])
+                                binding-pairs)))
+              (apply concat
+                     (map #(compile-form fns %) forms))
+              [[:rtn]]
+              (tag-with let-end
+                        [[:dum binding-size]])
+              (vec (repeat binding-size [:ldc 0]))
+              [[:ldf (str "@" let-start)]
+               [:rap binding-size]]
+              ))))
+
       ;; function call
       :else
       (let [[fn-form & args] form
