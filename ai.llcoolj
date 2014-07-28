@@ -1,3 +1,26 @@
+(look-for
+  [thing coord distance]
+  (let [contents (look-at coord)]
+    (if (= 0 contents)
+      0
+      (if (= thing contents)
+        coord
+        (if (> distance 0)
+          (let [leftward (look-for thing (to-the left coord) (dec distance))]
+            (if (atom? leftward)
+              (let [downward (look-for thing (to-the down coord) (dec distance))]
+                (if (atom? downward)
+                  (let [rightward (look-for thing (to-the right coord) (dec distance))]
+                    (if (atom? rightward)
+                      (let [upward (look-for thing (to-the up coord) (dec distance))]
+                        (if (atom? upward)
+                          0
+                          upward))
+                      rightward))
+                  downward))
+              leftward))
+          0)))))
+
 (find-nearby-pills
   [dirs coord distance]
   (filter (lambda [dir] (pill? (look-to-the dir coord distance))) dirs))
@@ -81,9 +104,29 @@
       (cdr set)
       (cons (car set) (set-delete (cdr set) item)))))
 
+(prioritized-moves
+  [start goal]
+  (let [start-x (x start)
+        start-y (y start)
+        goal-x (x goal)
+        goal-y (y goal)]
+
+    (cond
+      (* (<= start-x goal-x) (<= start-y goal-y))
+      [right down left up]
+
+      (* (<= start-x goal-x) (> start-y goal-y))
+      [right up left down]
+
+      (* (> start-x goal-x) (<= start-y goal-y))
+      [left down right up]
+
+      (* (> start-x goal-x) (> start-y goal-y))
+      [left up right down])))
+
 (neighbor-nodes
-  [coord]
-  (foreach [move (available-moves [left down right up] coord)]
+  [coord goal]
+  (foreach [move (available-moves (prioritized-moves coord goal) coord)]
             (to-the move coord)))
 
 (min*
@@ -147,7 +190,7 @@
     (let [current (min open #(map-get f-score % 0))]
       (if (= current goal)
         (reconstruct-path came-from goal)
-        (let [neighbors (->> (neighbor-nodes current)
+        (let [neighbors (->> (neighbor-nodes current goal)
                              (filter #(not (contains? closed %))))
               current-g-score (map-get g-score current 0)]
           (let [results (update-neighbors current goal neighbors f-score g-score current-g-score (set-delete open current) (set-insert closed current) came-from)
@@ -171,16 +214,22 @@
         [(to-the right start)]
         plan))))
 
-(next-move
+(ghost-locs
+  [world]
+  (->> (nth world 2)
+       (filter #(= (car %) 0))
+       (map #(nth % 1))) )
+
+(wander
   [last-square world]
-  (let [pills (find-pills [up right down left])
-        open-spaces (available-moves [left down right up] lman-coord)
-        unique-open-spaces (filter #(not (= (to-the % lman-coord) last-square)) open-spaces)]
-    (if (empty? pills)
-      (if (empty? unique-open-spaces)
-        (car open-spaces)
-        (car unique-open-spaces))
-      (car pills))))
+  (let [open-spaces (->> lman-coord
+                         (available-moves [left down right up])
+                         (map #(to-the % lman-coord))
+                         (filter #(not (contains? ghost-locs %))))
+        unique-open-spaces (filter #(not (= last-square %)) open-spaces)]
+    (if (empty? unique-open-spaces)
+      (car open-spaces)
+      (car unique-open-spaces))))
 
 (which-way-is
   [other me]
@@ -203,12 +252,20 @@
 
 (tile-cost
   [curr neighbor]
-  (let [tile (look-at neighbor)]
-       ;; pills, power pills, and fruit are cheaper
-       ;; than empty tiles
-       (if (+ (= tile 2) (= tile 3) (= tile 4))
-     0
-     1)))
+  (let [tile (look-at neighbor)
+        ghost-locs (->> (nth game-world 2)
+                        (filter #(= (car %) 0))
+                        (map #(nth % 1)))]
+    ;; ghosts are expensive if we're not in ghost-hunting mode
+    (if (contains? ghost-locs neighbor)
+      (let [ghost-distance (distance lman-coord neighbor)
+            ghost-cost (if (> ghost-distance 5) 0 (- 5 ghost-distance))]
+        (* ghost-cost ghost-cost))
+      ;; pills, power pills, and fruit are cheaper
+      ;; than empty tiles
+      (if (+ (= tile 2) (= tile 3) (= tile 4))
+        1
+        2))))
 
 (init
   [world ghost-ai]
@@ -226,7 +283,7 @@
   (let [power-pills (find-power-pills (world-map world))
         goal (nearest-power-pill power-pills (whereami world))]
     ;; goal, power-pills, panic-mode
-    [goal power-pills false])))
+    [goal power-pills '(0 0)])))
 
 (ghost-goal
   [ai-state world]
@@ -237,37 +294,42 @@
   [ai-state world]
   (let [pills (find-pills [up right down left])]
     (if (atom? pills)
-      0
-      (car pills))))
+      (let [nearby-pill (look-for 2 lman-coord 4)]
+        (if (not (atom? nearby-pill))
+          nearby-pill))
+      (to-the (car pills) lman-coord))))
 
 (goal
   [ai-state world]
   (let [current-goal (nth ai-state 0)
         power-pills (nth ai-state 1)
-        panic-mode? (nth ai-state 2)
+        last-square (nth ai-state 2)
         ghost (ghost-goal ai-state world)]
     (if (atom? ghost)
       (let [power-pill (nearest-power-pill power-pills lman-coord)]
         (if (atom? power-pill)
-          (pill-goal ai-state world)
+          (let [pill (pill-goal ai-state world)]
+            (if (atom? pill)
+              (wander last-square world)
+              pill))
           power-pill))
       ghost)))
 
 (step
   [ai-state world]
   (def game-map (world-map world))
+  (def game-world world)
   (def lman-coord (whereami world))
   (def g tile-cost)
-  (def h distance)
+  (def h #(* 2 (distance %1 %2)))
 
   (let [current-goal (nth ai-state 0)
         power-pills (nth ai-state 1)
-        panic-mode? (nth ai-state 2)
+        last-square (nth ai-state 2)
         new-power-pills (set-delete power-pills lman-coord)
-        new-goal (goal [current-goal new-power-pills panic-mode?] world)
-        new-panic-mode? (> (get-in [1 0] world) 0)]
+        new-goal (goal [current-goal new-power-pills last-square] world) ]
     (dbug new-goal)
-    (let [new-ai-state [new-goal new-power-pills new-panic-mode?]
+    (let [new-ai-state [new-goal new-power-pills lman-coord]
           path (a* lman-coord new-goal)
           next-square (nth path 1)
           dir (which-way-is next-square lman-coord)]
