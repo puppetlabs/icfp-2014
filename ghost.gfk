@@ -2,25 +2,42 @@
 LAMBDA-POS $lambda[x],$lambda[y]
 MY-POS $ghost[x],$ghost[y]
 MY-STAT $ghost-vit,$ghost-dir
+INT 3                           ; get my index in A
+MOV $me-index,A
 
-JMP @start                                   ;unconditional jump to start
+;;; <DEBUG CODE>
+MOV A,$random
+MOV B,$turn-counter
+MOV C,$me-index
+INT 8
+;;; </DEBUG>
+
+JGT @choose-mode,$turn-counter,0 ;jump to choose-mode if the turn counter > 0
+
+;;; INIT
+MOV $turn-counter,10            ;#init (we usually skip this)
+XOR $random,1
+
+DEC $turn-counter                ;#choose-mode (always dec the counter)
+JEQ @chase-mode,$random,0        ;if chase = 1, jump to chase-mode
+JMP @random-mode                 ;otherwise we're in random-mode
 
 ;;; DEFINE "FUNCTIONS"
-MOV A,0                                          ;#move-up
-INT 0
+MOV A,$random                                    ;#cleanup
+MOV B,$turn-counter
 HLT
 
-MOV A,1                                          ;#move-right
-INT 0
-HLT
+MOV $proposed-dir,0                                          ;#move-up
+JMP @dontbacktrack
 
-MOV A,2                                          ;#move-down
-INT 0
-HLT
+MOV $proposed-dir,1                                          ;#move-right
+JMP @dontbacktrack
 
-MOV A,3                                          ;#move-left
-INT 0
-HLT
+MOV $proposed-dir,2                                          ;#move-down
+JMP @dontbacktrack
+
+MOV $proposed-dir,3                                          ;#move-left
+JMP @dontbacktrack
 
 JGT @move-left,$ghost[x],$lambda[x]             ; #move-x
 JMP @move-right
@@ -29,14 +46,25 @@ JGT @move-up,$ghost[y],$lambda[y]               ; #move-y
 JMP @move-down
 
 
-;;; START HERE
+ADD-> $sum-of-dirs,$ghost-dir,$proposed-dir ; #dontbacktrack
+MOD-> $backtrack,$sum-of-dirs,2
+JEQ @veto,$backtrack,0
+MOV A,$proposed-dir
+INT 0
+JMP @cleanup
 
+INC $proposed-dir               ; #veto
+MOD-> A,$proposed-dir,4
+INT 0
+JMP @cleanup
+
+        ;; CHASE MODE
 ;;;             GET XDIST
 ;;; unless $ghost[x] > $lambda[x]
 ;;;   $xdist = $lambda[x] - $ghost[x]
 ;;; else
 ;;;   $xdist = $ghost[x] - $lambda[x]
-JGT @if-ghost[x]-bigger,$ghost[x],$lambda[x] ; #start
+JGT @if-ghost[x]-bigger,$ghost[x],$lambda[x] ; #chase-mode
 SUB-> $xdist,$lambda[x],$ghost[x]
 JMP @store-y-dist
 SUB-> $xdist,$ghost[x],$lambda[x]                         ; else #if-ghost[x]-bigger then A = C - A
@@ -52,6 +80,14 @@ JMP @choose-move
 SUB-> $ydist,$ghost[y],$lambda[y]                        ; else #if-ghost[y]-bigger then A = C - A
 JMP @choose-move
 
-;;; CHOOSE YOUR MOVE
+
+        ;; CHOOSE YOUR MOVE
 JGT @move-x,$xdist,$ydist                       ;if x-dist > y-dist then move-x #choose-move
 JMP @move-y                                     ;else move-y
+
+        ;; RANDOM MODE
+MUL-> $prandom,$ghost[x],$lambda[y]              ; #random-mode
+MUL-> $prandom,$ghost-dir,$lambda[x]
+MOD-> $new-dir,$prandom,4
+MOV $proposed-dir,$new-dir
+JMP @dontbacktrack
