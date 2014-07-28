@@ -234,11 +234,20 @@
     (dbug goal)
     '(goal power-pills))))
 
+(tile-cost
+  [curr neighbor]
+  (let [tile (look-at neighbor)]
+       ;; pills, power pills, and fruit are cheaper
+       ;; than empty tiles
+       (if (+ (= tile 2) (= tile 3) (= tile 4))
+	   0
+	   1)))
+
 (step
   [ai-state world]
   (def map (world-map world))
   (def lman-coord (whereami world))
-  (def g (lambda [curr neighbor] 1))
+  (def g tile-cost)
   (def h distance)
 
   (let [goal (car ai-state)
