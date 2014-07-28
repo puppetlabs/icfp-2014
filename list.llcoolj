@@ -1,7 +1,5 @@
 (empty? [val]
-  (if (atom? val)
-    (zero? val)
-    false))
+  (atom? val))
 
 (append
   [l1 l2]
