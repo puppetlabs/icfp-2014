@@ -36,9 +36,24 @@
     (zero? val)
     false))
 
+(append
+  [l1 l2]
+  (if (empty? l1)
+    l2
+    (cons (car l1)
+          (append (cdr l1) l2))))
+
 (pill? [cell]
   ;; "+ is or" -- branan
   (+ (= cell 2) (= cell 3)))
+
+(wall?
+  [cell]
+  (= cell 0))
+
+(movable?
+  [cell]
+  (not (wall? cell)))
 
 (whereami [world]
   (nth (nth world 1) 1))
@@ -46,7 +61,8 @@
 (make-coord [x y]
   (cons x y))
 
-(to-the [dir coord]
+(to-the
+  [dir coord]
   (cond
     (= dir up)
     (make-coord (x coord) (dec (y coord)))
@@ -59,6 +75,19 @@
 
     (= dir left)
     (make-coord (dec (x coord)) (y coord))))
+
+;; Look n squares in dir from coord. This progressively looks more and more
+;; squares out until it either sees a wall or reaches the limit. Result is
+;; either wall or the contents of the space n squares away.
+(look-to-the
+  [dir coord distance]
+  (def square-content (look-at (to-the dir coord)))
+  (if (wall? square-content)
+    ;; 0 == wall
+    0
+    (if (> distance 1)
+      (look-to-the dir (to-the dir coord) (dec distance))
+      square-content)))
 
 (filter [pred coll]
   (if (empty? coll)
@@ -78,19 +107,22 @@
     current
     (get-in (cdr indexes) current)))
 
-(find-pill [world-map coord]
-  (def points [(to-the up coord)
-               (to-the right coord)
-               (to-the down coord)
-               (to-the left coord)])
+(find-nearby-pills
+  [dirs coord distance]
+  (filter (lambda [dir] (pill? (look-to-the dir coord distance))) dirs))
 
-  (def point-contents (foreach [point points]
-			       (look-at world-map point)))
-  (def pill-locs (filter pill? point-contents))
+(find-pills
+  [dirs]
+  (def near-pills (find-nearby-pills dirs lman-coord 1))
+  (if (empty? near-pills)
+    (find-nearby-pills dirs lman-coord 2)
+    near-pills))
 
-  (if (empty? pill-locs)
-    left
-    (car pill-locs)))
+(available-moves
+  [dirs]
+  ;; Check in opposite order of pills to maximize odds of finding a pill
+  (->> dirs
+       (filter #(movable? (look-to-the % lman-coord 1)))))
 
 (x [coord]
   (col coord))
@@ -107,12 +139,26 @@
 (world-map [world]
   (car world))
 
-(look-at [world-map coord]
-  (nth (nth world-map (row coord)) (col coord)))
+(look-at [coord]
+  (nth (nth map (row coord)) (col coord)))
 
-(step [state world]
-  (def pill-location (find-pill (world-map world) (whereami world)))
-  (def dir (if (neg? pill-location)
-             up
-             pill-location))
-  '(state dir))
+(coord=
+  [a b]
+  (* (= (car a) (car b))
+     (= (cdr a) (cdr b))))
+
+(step
+  [last-square world]
+  (def map (world-map world))
+  (def lman-coord (whereami world))
+  (def pills (find-pills [up right down left]))
+  (def open-spaces (available-moves [left down right up]))
+  (def unique-open-spaces (filter #(not (coord= (to-the % lman-coord) last-square)) open-spaces))
+
+  (def next-move (if (empty? pills)
+                   (if (empty? unique-open-spaces)
+                     (car open-spaces)
+                     (car unique-open-spaces))
+                   (car pills)))
+
+  '(lman-coord next-move))

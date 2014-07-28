@@ -232,13 +232,13 @@
       ;; Variable declaration
       (= (first form) 'def)
       (let [[_ var-name val] form]
-        (if (neg? (.indexOf @globals var-name))
+        (if (neg? (.indexOf @globals (name var-name)))
           (swap! globals conj (name var-name)))
         (concat
          (compile-form fns val)
          [[:st (count *scope*) (str "^" var-name) (format "; store %s" var-name)]]))
 
-      (= (first form) 'lambda)
+      (or (= (first form) 'lambda) (= (first form) 'fn*))
       (let [[_ args & forms] form
             fn-name (gensym (str (*cur-fun* "-lambda")))
             fn-end (str fn-name "-end")
@@ -331,6 +331,8 @@
   [fns]
   ;; This depends on the initial state we want
   (let [code [[:ldc 0 "; #main"]
+              [:ldc 0]
+              [:cons]
               (load-global 'step)
               [:cons]
               [:rtn "; end main"]]
@@ -407,4 +409,5 @@
             (generate-prelude)
             (emit-code)
             (resolve-references)
-            (#(string/join "\n" %)))))))
+            (vec)
+            (#(string/join "\n" (conj % nil))))))))
