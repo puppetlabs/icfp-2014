@@ -3,7 +3,7 @@
   (let [contents (look-at coord)]
     (if (= 0 contents)
       0
-      (if (= thing contents)
+      (if (* (= thing contents) (not (contains? (ghost-locs game-world) coord)))
         coord
         (if (> distance 0)
           (let [leftward (look-for thing (to-the left coord) (dec distance))]
@@ -29,7 +29,13 @@
   [dirs]
   (let [near-pills (find-nearby-pills dirs lman-coord 1)]
     (if (empty? near-pills)
-      (find-nearby-pills dirs lman-coord 2)
+      (let [near-pills (find-nearby-pills dirs lman-coord 2)]
+        (if (empty? near-pills)
+          (let [near-pills (find-nearby-pills dirs lman-coord 3)]
+            (if (empty? near-pills)
+              (find-nearby-pills dirs lman-coord 4)
+              near-pills))
+          near-pills))
       near-pills)))
 
 (find-power-pills
@@ -69,7 +75,7 @@
   [power-pills coord]
   (if (empty? power-pills)
     0
-    (min power-pills #(distance coord %))))
+    (min (filter #(not (contains? (ghost-locs game-world) %)) power-pills) #(distance coord %))))
 
 (nearest-ghost
   [ghosts coord]
@@ -280,7 +286,7 @@
     (if (contains? ghost-locs neighbor)
       (let [ghost-distance (distance lman-coord neighbor)
             ghost-cost (if (> ghost-distance 5) 0 (- 5 ghost-distance))]
-        (* ghost-cost ghost-cost))
+        (* ghost-cost ghost-cost ghost-cost ghost-cost))
       ;; pills, power pills, and fruit are cheaper
       ;; than empty tiles
       (if (+ (= tile 2) (= tile 3) (= tile 4))
@@ -295,6 +301,7 @@
   ;;#..\#
   ;;#####
   ;;
+  (def game-world world)
   (let [game-map [[0 0 0 0 0]
                   [0 3 3 3 0]
                   [0 1 0 1 0]
@@ -325,10 +332,11 @@
   (let [current-goal (nth ai-state 0)
         power-pills (nth ai-state 1)
         fruit (nth ai-state 2)
+        fruit-status (cdr (cdr (cdr world)))
         last-square (nth ai-state 3)
         ghost (debug (ghost-goal ai-state world))]
     (if (atom? ghost)
-      (if (cdr (cdr (cdr world)))
+      (if (* fruit-status (not (contains? (ghost-locs world) fruit)))
         fruit
         (let [power-pill (nearest-power-pill power-pills lman-coord)]
           (if (atom? power-pill)
