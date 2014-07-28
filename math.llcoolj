@@ -1,0 +1,32 @@
+(asm abs "math/abs.gcc")
+(asm % "math/mod.gcc")
+(asm > "math/gt.gcc")
+(asm >= "math/gte.gcc")
+(asm = "math/eq.gcc")
+(asm not "math/not.gcc")
+(asm distance "math/distance.gcc")
+(asm nth "math/nth.gcc")
+
+(pos? [x]
+  (> x 0))
+
+(neg? [x]
+  (< x 0))
+
+(zero? [x]
+  (= x 0))
+
+(<= [x y]
+  (>= y x))
+
+(< [x y]
+  (> y x))
+
+(!= [x y]
+  (not (= x y)))
+
+(false? [val]
+  (= val false))
+
+(true? [val]
+  (not (false? val)))

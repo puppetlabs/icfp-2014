@@ -1,0 +1,29 @@
+(empty? [val]
+  (if (atom? val)
+    (zero? val)
+    false))
+
+(append
+  [l1 l2]
+  (if (empty? l1)
+    l2
+    (cons (car l1)
+          (append (cdr l1) l2))))
+
+(filter [pred coll]
+  (if (empty? coll)
+    coll
+    (if (pred (car coll))
+      (cons (car coll) (filter pred (cdr coll)))
+      (filter pred (cdr coll)))))
+
+(map [func coll]
+  (if (empty? coll)
+    coll
+    (cons (func (car coll)) (map func (cdr coll)))))
+
+(get-in [indexes lst]
+  (def current (nth lst (car indexes)))
+  (if (empty? (cdr indexes))
+    current
+    (get-in (cdr indexes) current)))

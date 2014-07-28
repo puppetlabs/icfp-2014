@@ -3,5 +3,5 @@
 
 (defn -main
   "I do a whole lot."
-  [file & args]
-  (println (compiler/compile-ai file)))
+  [& files]
+  (println (apply compiler/compile-files files)))

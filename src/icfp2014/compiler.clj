@@ -364,21 +364,26 @@
        :length (count code)})))
 
 (defn compile-ai
-  [file]
-  {:pre [(string? file)]
-   :post [(string? %)]}
-  (let [prog (java.io.PushbackReader. (clojure.java.io/reader file))]
-    (loop [form (read prog false nil)
-           fns []]
-      (if form
-        (let [func (if (= (first form) 'asm)
-                     (import-asm (second form) (last form))
-                     (compile-function (walk/macroexpand-all form) fns))]
-          (recur (read prog false nil) (conj fns func)))
-        (-> fns
-            (generate-main)
-            (generate-prelude)
-            (emit-code)
-            (resolve-references)
-            (vec)
-            (#(string/join "\n" (conj % nil))))))))
+  [reader]
+  {:post [(string? %)]}
+  (loop [form (read reader false nil)
+         fns []]
+    (if form
+      (let [func (if (= (first form) 'asm)
+                   (import-asm (second form) (last form))
+                   (compile-function (walk/macroexpand-all form) fns))]
+        (recur (read reader false nil) (conj fns func)))
+      (-> fns
+          (generate-main)
+          (generate-prelude)
+          (emit-code)
+          (resolve-references)
+          (vec)
+          (#(string/join "\n" (conj % nil)))))))
+
+(defn compile-files
+  [& files]
+  (-> (reduce #(string/join "\n" [%1 (slurp %2)]) "" files)
+      (java.io.StringReader.)
+      (java.io.PushbackReader.)
+      (compile-ai)))

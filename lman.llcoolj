@@ -1,0 +1,68 @@
+(pill? [cell]
+  ;; "+ is or" -- branan
+  (+ (= cell 2) (= cell 3)))
+
+(wall?
+  [cell]
+  (= cell 0))
+
+(movable?
+  [cell]
+  (not (wall? cell)))
+
+(whereami [world]
+  (nth (nth world 1) 1))
+
+(make-coord [x y]
+  (cons x y))
+
+(to-the
+  [dir coord]
+  (cond
+    (= dir up)
+    (make-coord (x coord) (dec (y coord)))
+
+    (= dir right)
+    (make-coord (inc (x coord)) (y coord))
+
+    (= dir down)
+    (make-coord (x coord) (inc (y coord)))
+
+    (= dir left)
+    (make-coord (dec (x coord)) (y coord))))
+
+;; Look n squares in dir from coord. This progressively looks more and more
+;; squares out until it either sees a wall or reaches the limit. Result is
+;; either wall or the contents of the space n squares away.
+(look-to-the
+  [dir coord distance]
+  (def square-content (look-at (to-the dir coord)))
+  (if (wall? square-content)
+    ;; 0 == wall
+    0
+    (if (> distance 1)
+      (look-to-the dir (to-the dir coord) (dec distance))
+      square-content)))
+
+(x [coord]
+  (col coord))
+
+(y [coord]
+  (row coord))
+
+(row [coord]
+  (cdr coord))
+
+(col [coord]
+  (car coord))
+
+(world-map [world]
+  (car world))
+
+(look-at [coord]
+  (nth (nth map (row coord)) (col coord)))
+
+(coord=
+  [a b]
+  (* (= (car a) (car b))
+     (= (cdr a) (cdr b))))
