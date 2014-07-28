@@ -187,7 +187,7 @@
                         (format "MOV $TMP,%s" dest)
                         (format "MOV %s,%s" dest x)
                         (format "SUB %s,$TMP" dest)])
-                     
+
                      "JMP"
                      (let [[dest] args]
                        [(format "JEQ %s,0,0" dest)]))
@@ -195,13 +195,18 @@
         (s/join "\n" instrs))
       line)))
 
+(defn resplit
+  [lines]
+  (s/split (s/join "\n" lines) #"\n"))
+
 (defn tag-file*
   [fin-path]
   (->> fin-path
        io/reader
        line-seq
-       tag-lines
        (map macrolize)
+       resplit
+       tag-lines
        var-lines
        check-length
        (s/join "\n")))
