@@ -15,6 +15,24 @@
   (->> dirs
        (filter #(movable? (look-to-the % lman-coord 1)))))
 
+(map-get
+  [m k default]
+  (if (empty? m)
+    default
+    (let [cell (car m)]
+      (if (= (car cell) k)
+        (cdr cell)
+        (map-get (cdr m) k default)))))
+
+(map-set
+  [m k v]
+  (if (empty? m)
+    (cons (cons k v) 0)
+    (let [cell (car m)]
+      (if (= (car cell) k)
+        (cons (cons k v) (cdr m))
+        (cons cell (map-set (cdr m) k v))))))
+
 (next-move
   [last-square world]
   (let [pills (find-pills [up right down left])
