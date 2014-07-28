@@ -302,6 +302,8 @@
   [fns]
   ;; This depends on the initial state we want
   (let [code [[:ldc 0 "; #main"]
+              [:ldc 0]
+              [:cons]
               (load-global 'step)
               [:cons]
               [:rtn "; end main"]]
