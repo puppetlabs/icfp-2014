@@ -10,10 +10,10 @@
     near-pills))
 
 (available-moves
-  [dirs]
+  [dirs coord]
   ;; Check in opposite order of pills to maximize odds of finding a pill
   (->> dirs
-       (filter #(movable? (look-to-the % lman-coord 1)))))
+       (filter #(movable? (look-to-the % coord 1)))))
 
 (map-get
   [m k default]
@@ -55,20 +55,129 @@
       (cdr set)
       (set-delete (cdr set) item))))
 
+(neighbor-nodes
+  [coord]
+  (available-moves [left down right up] coord))
+
+(min*
+  [l f best best-cost]
+  (if (empty? l)
+    best
+    (let [cur (car l)
+          cur-cost (f cur)]
+      (if (< cur-cost best-cost)
+        (min (cdr l) f cur cur-cost)
+        (min (cdr l) f best best-cost)))))
+
+(min
+  [l f]
+  (min* (cdr l) f (car l) (f (car l))))
+
+;; while openset is not empty
+;;     current := the node in openset having the lowest f_score[] value
+;;     if current = goal
+;;         return reconstruct_path(came_from, goal)
+
+;;     remove current from openset !!!
+;;     add current to closedset
+;;     for each neighbor in neighbor_nodes(current)
+;;         if neighbor in closedset
+;;             continue
+;;         tentative_g_score := g_score[current] + dist_between(current,neighbor)
+
+;;         if neighbor not in openset or tentative_g_score < g_score[neighbor] 
+;;             came_from[neighbor] := current
+;;             g_score[neighbor] := tentative_g_score
+;;             f_score[neighbor] := g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
+;;             if neighbor not in openset
+;;                 add neighbor to openset
+;; g = constantly 1
+;; h = manhattan distance
+(reconstruct-path
+  [came-from node]
+  (let [node-came-from (map-get came-from node 0)]
+    (if node-came-from
+      (append (reconstruct-path came-from node-came-from) [node])
+      node)))
+
+(update-neighbors
+  [current goal neighbors f-score g-score current-g-score open closed came-from]
+  (if (empty? neighbors)
+    [f-score g-score open closed came-from]
+    (let [neighbor (car neighbors)
+          tentative-score (neighbor (+ current-g-score (g current neighbor)))]
+      (if (+ (not (contains? open neighbor)) (< tentative-score (map-get g-score neighbor 0)))
+        (let [new-came-from (map-set came-from neighbor current)
+              new-g-score (map-set g-score neighbor tentative-score)
+              new-f-score (+ tentative-score (h neighbor goal))
+              new-open (set-insert open neighbor)]
+          (update-neighbors goal (cdr neighbors) new-f-score new-g-score current-g-score new-open closed new-came-from))
+        (update-neighbors goal (cdr neighbors) f-score g-score current-g-score open closed came-from)))))
+
+(a**
+  [goal f-score g-score open closed came-from]
+  (if (not (empty? open))
+    (let [current (min open #(map-get f-score %))]
+      (if (= current goal)
+        (reconstruct-path came-from goal)
+        (let [neighbors (->> (neighbor-nodes current)
+                             (filter #(contains? closed %)))
+              current-g-score (map-get g-score current)]
+          (let [results (update-neighbors current goal neighbors f-score g-score current-g-score (set-delete open current) (set-insert closed current) came-from)
+                new-f-score (nth results 0)
+                new-g-score (nth results 1)
+                new-open (nth results 2)
+                new-closed (nth results 3)
+                new-came-from (nth results 4)]
+            (a** goal new-f-score new-g-score new-open new-closed new-came-from)))))))
+
+(a*
+  [start goal]
+  (let [closed []
+        open [start]
+        came-from {}
+        g-score {start 0}
+        f-score {start (+ (map-get g-score start) (h start goal))}]
+    (a** goal f-score g-score open closed came-from)))
+
 (next-move
   [last-square world]
   (let [pills (find-pills [up right down left])
-        open-spaces (available-moves [left down right up])
-        unique-open-spaces (filter #(not (coord= (to-the % lman-coord) last-square)) open-spaces)]
+        open-spaces (available-moves [left down right up] lman-coord)
+        unique-open-spaces (filter #(not (= (to-the % lman-coord) last-square)) open-spaces)]
     (if (empty? pills)
       (if (empty? unique-open-spaces)
         (car open-spaces)
         (car unique-open-spaces))
       (car pills))))
 
+(which-way-is
+  [other me]
+  (let [my-x (x me)
+        my-y (y me)
+        other-x (x other)
+        other-y (y other)]
+    (cond
+      (< my-x other-x)
+      right)
+
+      (> my-x other-x)
+      left
+
+      (< my-y other-y)
+      down
+
+      (> my-y other-y)
+      up))
+
 (step
   [last-square world]
   (def map (world-map world))
   (def lman-coord (whereami world))
+  (def g (lambda [curr neighbor] 1))
+  (def h distance)
 
-  '(lman-coord (next-move last-square world)))
+  (let [next-square (car (a* lman-coord '(0 0)))
+        dir (which-way-is next-square lman-coord)]
+
+    '(lman-coord dir)))
