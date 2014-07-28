@@ -89,41 +89,100 @@
      (format "%s $TMP,%s" op y)
      (format "MOV %s,$TMP" dest)]))
 
+(def macros #{"SUB->"
+              "ADD->"
+              "MUL->"
+              "DIV->"
+              "AND->"
+              "OR->"
+              "XOR->"
+              "JMP"
+              "LAMBDA-POS"
+              "MY-POS"
+              "GHOST-POS"
+              "SQUARE-AT"
+              "GHOST-STAT"
+              "MY-STAT"})
+
 (defn macrolize
   [line]
   (let [parts  (s/split line #"\s")
-        op     (first parts)
-        args   (s/split (second parts) #",")
-        extra  (str " " (s/join " " (drop 2 parts)))
-        instrs (case op
+        op     (first parts)]
+    (if (macros op)
+      (let [args   (if-let [unparsed-args (second parts)]
+                     (s/split unparsed-args #",")
+                     [])
+            extra  (str " " (s/join " " (drop 2 parts)))
+            instrs (case op
 
-                 "SUB->"
-                 (macrolize-mathop "SUB" args)
+                     "SUB->"
+                     (macrolize-mathop "SUB" args)
 
-                 "ADD->"
-                 (macrolize-mathop "ADD" args)
+                     "ADD->"
+                     (macrolize-mathop "ADD" args)
 
-                 "MUL->"
-                 (macrolize-mathop "MUL" args)
+                     "MUL->"
+                     (macrolize-mathop "MUL" args)
 
-                 "DIV->"
-                 (macrolize-mathop "DIV" args)
+                     "DIV->"
+                     (macrolize-mathop "DIV" args)
 
-                 "AND->"
-                 (macrolize-mathop "AND" args)
+                     "AND->"
+                     (macrolize-mathop "AND" args)
 
-                 "OR->"
-                 (macrolize-mathop "OR" args)
+                     "OR->"
+                     (macrolize-mathop "OR" args)
 
-                 "XOR->"
-                 (macrolize-mathop "XOR" args)
+                     "XOR->"
+                     (macrolize-mathop "XOR" args)
 
-                 "JMP"
-                 (let [[dest] args]
-                   [(format "JEQ %s,0,0" dest)]))
+                     "LAMBDA-POS"
+                     (let [[xdest ydest] args]
+                       ["INT 1"
+                        (format "MOV %s,A" xdest)
+                        (format "MOV %s,B" ydest)])
 
-        instrs (update-in instrs [0] str extra)]
-         (s/join "\n" instrs)))
+                     "MY-POS"
+                     (let [[xdest ydest] args]
+                       ["INT 3"
+                        "INT 5"
+                        (format "MOV %s,A" xdest)
+                        (format "MOV %s,B" ydest)])
+
+                     "GHOST-POS"
+                     (let [[ghost xdest ydest] args]
+                       [(format "MOV A,%s" ghost)
+                        "INT 5"
+                        (format "MOV %s,A" xdest)
+                        (format "MOV %s,B" ydest)])
+
+                     "SQUARE-AT"
+                     (let [[dest x y] args]
+                       [(format "MOV A,%s" x)
+                        (format "MOV B,%s" y)
+                        "INT 7"
+                        (format "MOV %s,A" dest)])
+
+                     "GHOST-STAT"
+                     (let [[dest-vit dest-dir ghost] args]
+                       [(format "MOV A,%s" ghost)
+                        "INT 6"
+                        (format "MOV %s,A" dest-vit)
+                        (format "MOV %s,B" dest-dir)])
+
+                     "MY-STAT"
+                     (let [[dest-vit dest-dir ghost] args]
+                       ["INT 3"
+                        "INT 6"
+                        (format "MOV %s,A" dest-vit)
+                        (format "MOV %s,B" dest-dir)])
+
+                     "JMP"
+                     (let [[dest] args]
+                       [(format "JEQ %s,0,0" dest)]))
+            instrs (update-in instrs [0] str extra " ; " line)]
+        (s/join "\n" instrs))
+      line)))
 
 (defn tag-file*
   [fin-path]
