@@ -61,8 +61,3 @@
 
 (look-at [coord]
   (nth (nth map (row coord)) (col coord)))
-
-(coord=
-  [a b]
-  (* (= (car a) (car b))
-     (= (cdr a) (cdr b))))

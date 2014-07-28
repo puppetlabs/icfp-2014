@@ -2,7 +2,7 @@
 (asm % "math/mod.gcc")
 (asm > "math/gt.gcc")
 (asm >= "math/gte.gcc")
-(asm = "math/eq.gcc")
+(asm eq "math/eq.gcc")
 (asm not "math/not.gcc")
 (asm distance "math/distance.gcc")
 (asm nth "math/nth.gcc")
@@ -24,6 +24,16 @@
 
 (!= [x y]
   (not (= x y)))
+
+(= [x y]
+ (if (atom? x)
+  (eq x y)
+  (pair= x y)))
+
+(pair=
+  [a b]
+  (* (eq (car a) (car b))
+     (eq (cdr a) (cdr b))))
 
 (false? [val]
   (= val false))

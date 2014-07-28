@@ -33,6 +33,28 @@
         (cons (cons k v) (cdr m))
         (cons cell (map-set (cdr m) k v))))))
 
+(contains?
+  [coll key]
+  (if (empty? coll)
+    false
+    (if (= (car coll) key)
+      true
+      (contains? (cdr coll) key))))
+
+(set-insert
+  [set item]
+  (if (contains? set item)
+    set
+    (cons item set)))
+
+(set-delete
+  [set item]
+  (if (empty? set)
+    set
+    (if (= (car set) item)
+      (cdr set)
+      (set-delete (cdr set) item))))
+
 (next-move
   [last-square world]
   (let [pills (find-pills [up right down left])
