@@ -4,10 +4,10 @@
 
 (find-pills
   [dirs]
-  (def near-pills (find-nearby-pills dirs lman-coord 1))
-  (if (empty? near-pills)
-    (find-nearby-pills dirs lman-coord 2)
-    near-pills))
+  (let [near-pills (find-nearby-pills dirs lman-coord 1)]
+    (if (empty? near-pills)
+      (find-nearby-pills dirs lman-coord 2)
+      near-pills)))
 
 (find-power-pills
   [map]
@@ -24,12 +24,17 @@
 
 (nearest-power-pill
   [power-pills coord]
-  (min power-pills #(distance coord %)))
+  (if (empty? power-pills)
+    0
+    (min power-pills #(distance coord %))))
 
 (nearest-ghost
   [ghosts coord]
-  (-> (map #(nth % 1) ghosts)
-      (min #(distance coord %))))
+  (let [living-ghosts (filter #(not (= (car %) 2)) ghosts)]
+    (if (empty? living-ghosts)
+      0
+      (-> (map #(nth % 1) living-ghosts )
+          (min #(distance coord %))))))
 
 (available-moves
   [dirs coord]
@@ -223,17 +228,30 @@
     ;; goal, power-pills, panic-mode
     [goal power-pills false])))
 
+(ghost-goal
+  [ai-state world]
+  (if (> (get-in [1 0] world) 0)
+    (nearest-ghost (nth world 2) lman-coord)))
+
+(pill-goal
+  [ai-state world]
+  (let [pills (find-pills [up right down left])]
+    (if (atom? pills)
+      0
+      (car pills))))
+
 (goal
   [ai-state world]
-  ;; If panic mode, go ghost hunting
   (let [current-goal (nth ai-state 0)
         power-pills (nth ai-state 1)
-        panic-mode? (nth ai-state 2)]
-    (if (> (get-in [1 0] world) 0)
-      (nearest-ghost (nth world 2) lman-coord)
-      (if (+ panic-mode? (= lman-coord current-goal))
-        (nearest-power-pill power-pills lman-coord)
-        current-goal))))
+        panic-mode? (nth ai-state 2)
+        ghost (ghost-goal ai-state world)]
+    (if (atom? ghost)
+      (let [power-pill (nearest-power-pill power-pills lman-coord)]
+        (if (atom? power-pill)
+          (pill-goal ai-state world)
+          power-pill))
+      ghost)))
 
 (step
   [ai-state world]
