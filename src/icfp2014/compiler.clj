@@ -63,6 +63,9 @@
 
    'atom? (fn [val]
             (concat val [[:atom]]))
+
+   'dbug (fn [val]
+           (concat val [[:dbug]]))
    })
 
 (defn fail-on-qualified-symbols
@@ -334,12 +337,15 @@
 (defn generate-main
   [fns]
   ;; This depends on the initial state we want
-  (let [code [[:ldc 0 "; #main"]
-              [:ldc 0]
-              [:cons]
-              (load-global 'step)
-              [:cons]
-              [:rtn "; end main"]]
+  (let [code (tag-with "main"
+                       [(load-global 'testing)
+                        [:ap 0]
+                        [:ldc 0]
+                        [:ldc 0]
+                        [:cons]
+                        (load-global 'step)
+                        [:cons]
+                        [:rtn "; end main"]])
         main {:name 'main
               :code code
               :length (count code)}]

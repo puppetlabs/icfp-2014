@@ -11,7 +11,6 @@
 
 (available-moves
   [dirs coord]
-  ;; Check in opposite order of pills to maximize odds of finding a pill
   (->> dirs
        (filter #(movable? (look-to-the % coord 1)))))
 
@@ -53,11 +52,12 @@
     set
     (if (= (car set) item)
       (cdr set)
-      (set-delete (cdr set) item))))
+      (cons (car set) (set-delete (cdr set) item)))))
 
 (neighbor-nodes
   [coord]
-  (available-moves [left down right up] coord))
+  (foreach [move (available-moves [left down right up] coord)]
+            (to-the move coord)))
 
 (min*
   [l f best best-cost]
@@ -66,8 +66,8 @@
     (let [cur (car l)
           cur-cost (f cur)]
       (if (< cur-cost best-cost)
-        (min (cdr l) f cur cur-cost)
-        (min (cdr l) f best best-cost)))))
+        (min* (cdr l) f cur cur-cost)
+        (min* (cdr l) f best best-cost)))))
 
 (min
   [l f]
@@ -85,7 +85,7 @@
 ;;             continue
 ;;         tentative_g_score := g_score[current] + dist_between(current,neighbor)
 
-;;         if neighbor not in openset or tentative_g_score < g_score[neighbor] 
+;;         if neighbor not in openset or tentative_g_score < g_score[neighbor]
 ;;             came_from[neighbor] := current
 ;;             g_score[neighbor] := tentative_g_score
 ;;             f_score[neighbor] := g_score[neighbor] + heuristic_cost_estimate(neighbor, goal)
@@ -96,40 +96,41 @@
 (reconstruct-path
   [came-from node]
   (let [node-came-from (map-get came-from node 0)]
-    (if node-came-from
+    (if (not (atom? node-came-from))
       (append (reconstruct-path came-from node-came-from) [node])
-      node)))
+      [node])))
 
 (update-neighbors
   [current goal neighbors f-score g-score current-g-score open closed came-from]
   (if (empty? neighbors)
     [f-score g-score open closed came-from]
     (let [neighbor (car neighbors)
-          tentative-score (neighbor (+ current-g-score (g current neighbor)))]
+          tentative-score (+ current-g-score (g current neighbor))]
       (if (+ (not (contains? open neighbor)) (< tentative-score (map-get g-score neighbor 0)))
         (let [new-came-from (map-set came-from neighbor current)
               new-g-score (map-set g-score neighbor tentative-score)
-              new-f-score (+ tentative-score (h neighbor goal))
+              new-f-score (map-set f-score neighbor (+ tentative-score (h neighbor goal)))
               new-open (set-insert open neighbor)]
-          (update-neighbors goal (cdr neighbors) new-f-score new-g-score current-g-score new-open closed new-came-from))
-        (update-neighbors goal (cdr neighbors) f-score g-score current-g-score open closed came-from)))))
+          (update-neighbors current goal (cdr neighbors) new-f-score new-g-score current-g-score new-open closed new-came-from))
+        (update-neighbors current goal (cdr neighbors) f-score g-score current-g-score open closed came-from)))))
 
 (a**
   [goal f-score g-score open closed came-from]
   (if (not (empty? open))
-    (let [current (min open #(map-get f-score %))]
+    (let [current (min open #(map-get f-score % 0))]
       (if (= current goal)
         (reconstruct-path came-from goal)
         (let [neighbors (->> (neighbor-nodes current)
-                             (filter #(contains? closed %)))
-              current-g-score (map-get g-score current)]
+                             (filter #(not (contains? closed %))))
+              current-g-score (map-get g-score current 0)]
           (let [results (update-neighbors current goal neighbors f-score g-score current-g-score (set-delete open current) (set-insert closed current) came-from)
                 new-f-score (nth results 0)
                 new-g-score (nth results 1)
                 new-open (nth results 2)
                 new-closed (nth results 3)
                 new-came-from (nth results 4)]
-            (a** goal new-f-score new-g-score new-open new-closed new-came-from)))))))
+            (a** goal new-f-score new-g-score new-open new-closed new-came-from)))))
+    []))
 
 (a*
   [start goal]
@@ -137,8 +138,11 @@
         open [start]
         came-from {}
         g-score {start 0}
-        f-score {start (+ (map-get g-score start) (h start goal))}]
-    (a** goal f-score g-score open closed came-from)))
+        f-score {start (+ (map-get g-score start 0) (h start goal))}]
+    (let [plan (a** goal f-score g-score open closed came-from)]
+      (if (empty? plan)
+        [(to-the right start)]
+        plan))))
 
 (next-move
   [last-square world]
@@ -159,7 +163,7 @@
         other-y (y other)]
     (cond
       (< my-x other-x)
-      right)
+      right
 
       (> my-x other-x)
       left
@@ -168,7 +172,11 @@
       down
 
       (> my-y other-y)
-      up))
+      up)))
+
+(testing
+  []
+  0)
 
 (step
   [last-square world]
@@ -177,7 +185,7 @@
   (def g (lambda [curr neighbor] 1))
   (def h distance)
 
-  (let [next-square (car (a* lman-coord '(0 0)))
+  (let [next-square (nth (a* lman-coord '(1 1)) 1)
         dir (which-way-is next-square lman-coord)]
 
     '(lman-coord dir)))

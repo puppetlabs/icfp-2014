@@ -4,7 +4,7 @@
 (asm >= "math/gte.gcc")
 (asm eq "math/eq.gcc")
 (asm not "math/not.gcc")
-(asm distance "math/distance.gcc")
+#_(asm distance "math/distance.gcc")
 (asm nth "math/nth.gcc")
 
 (pos? [x]
@@ -29,6 +29,15 @@
  (if (atom? x)
   (eq x y)
   (pair= x y)))
+
+(distance
+ [a b]
+ (let [x1 (car a)
+       y1 (cdr a)
+       x2 (car b)
+       y2 (cdr b)]
+   (+ (abs (- x1 x2))
+      (abs (- y1 y2)))))
 
 (pair=
   [a b]
