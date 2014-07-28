@@ -36,6 +36,13 @@
     (zero? val)
     false))
 
+(append
+  [l1 l2]
+  (if (empty? l1)
+    l2
+    (cons (car l1)
+          (append (cdr l1) l2))))
+
 (pill? [cell]
   ;; "+ is or" -- branan
   (+ (= cell 2) (= cell 3)))
