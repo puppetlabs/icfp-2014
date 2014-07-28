@@ -232,7 +232,7 @@
       ;; Variable declaration
       (= (first form) 'def)
       (let [[_ var-name val] form]
-        (if (neg? (.indexOf @globals var-name))
+        (if (neg? (.indexOf @globals (name var-name)))
           (swap! globals conj (name var-name)))
         (concat
          (compile-form fns val)
