@@ -238,7 +238,7 @@
          (compile-form fns val)
          [[:st (count *scope*) (str "^" var-name) (format "; store %s" var-name)]]))
 
-      (= (first form) 'lambda)
+      (or (= (first form) 'lambda) (= (first form) 'fn*))
       (let [[_ args & forms] form
             fn-name (gensym (str (*cur-fun* "-lambda")))
             fn-end (str fn-name "-end")
